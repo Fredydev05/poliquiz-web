@@ -1,0 +1,29 @@
+/* Importa todo Tailwind CSS (v4). Con esta sola línea ya tenemos
+   disponibles todas las clases utilitarias (bg-*, flex, p-4, etc). */
+@import "tailwindcss";
+
+/* -------------------------------------------------------------------
+   PALETA INSTITUCIONAL
+   En Tailwind v4 definimos colores personalizados dentro de @theme.
+   Cada variable --color-NOMBRE genera utilidades automáticamente:
+   --color-marino  ->  bg-marino, text-marino, border-marino ...
+   ------------------------------------------------------------------- */
+@theme {
+  /* Color principal / dominante (azul marino institucional) */
+  /*--color-marino: #2c3e50; feo de la facultad*/
+  --color-marino: #002a54;
+  --color-marino-claro: #34495e;
+
+  /* Colores de acentuación estilo Kahoot (versión corporativa/académica) */
+  --color-coral: #e05a4d;     /* Opción A · Rojo suave / coral   · Triángulo */
+  --color-azul: #2980b9;      /* Opción B · Azul brillante        · Rombo     */
+  --color-dorado: #e6a817;    /* Opción C · Amarillo / dorado     · Círculo   */
+  --color-esmeralda: #27ae60; /* Opción D · Verde esmeralda       · Cuadrado  */
+  --color-azul-intenso: #007fff;      /* Opción E · Azul Intenso         · Estrella  */
+}
+
+/* Tipografía base agradable y suavizado de fuentes */
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}

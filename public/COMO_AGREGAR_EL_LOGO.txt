@@ -1,0 +1,10 @@
+Guardá la imagen del logo de la Facultad Politécnica en esta carpeta
+con el nombre exacto:  logo.png
+
+Ruta final:  public/logo.png
+
+El código ya lo referencia como "/logo.png", así que apenas pongas
+el archivo aquí aparecerá automáticamente en la pantalla de ingreso
+y en el panel del docente.
+
+(Podés borrar este archivo .txt cuando termines.)
