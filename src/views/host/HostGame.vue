@@ -39,9 +39,16 @@ const estilos = [
 
 onMounted(async () => {
   const pin = route.params.pin
-  if (game.pin !== pin) {
-    game.reset()
-    await game.hydrate(pin)
+  try {
+    if (game.pin !== pin) {
+      game.reset()
+      await game.hydrate(pin)
+    }
+  } catch {
+    // La sala ya no existe (terminó o expiró): limpiar y volver al dashboard.
+    game.clearActive()
+    router.replace('/dashboard')
+    return
   }
   qrDataUrl.value = await QRCode.toDataURL(game.joinUrl, { width: 220, margin: 1 })
   cargando.value = false
@@ -50,6 +57,13 @@ onMounted(async () => {
     timer.sync(game.endsAtMs, game.serverNowMs, game.question.time_limit)
   }
 })
+
+// Al terminar normalmente (podium → ended) dejamos de ofrecer "retomar".
+async function terminar() {
+  await game.next()
+  game.clearActive()
+  router.push('/dashboard')
+}
 
 onUnmounted(() => {
   detenerConfeti()
@@ -328,7 +342,7 @@ function detenerConfeti() {
         </div>
       </div>
 
-      <BaseButton variant="ghost" @click="game.next().then(() => router.push('/dashboard'))">
+      <BaseButton variant="ghost" @click="terminar">
         Terminar y volver al dashboard
       </BaseButton>
     </div>

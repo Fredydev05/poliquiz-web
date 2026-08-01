@@ -24,7 +24,7 @@ onMounted(() => {
 const menu = [
   { label: 'Mis cuestionarios', icon: LayoutDashboard, action: () => router.push('/dashboard'), path: '/dashboard' },
   { label: 'Crear cuestionario', icon: FilePlus2, action: crearYEditar, path: '/editor' },
-  { label: 'Reportes', icon: BarChart3, action: null, path: null },     // llega en F6
+  { label: 'Reportes', icon: BarChart3, action: () => router.push('/reportes'), path: '/reportes' },
   { label: 'Configuración', icon: Settings, action: null, path: null },
 ]
 

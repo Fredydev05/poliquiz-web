@@ -7,12 +7,13 @@
 */
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Play, Pencil, Plus, FileQuestion, Copy, Trash2, Loader } from 'lucide-vue-next'
+import { Play, Pencil, Plus, FileQuestion, Copy, Trash2, Loader, Radio, X } from 'lucide-vue-next'
 import TeacherLayout from './TeacherLayout.vue'
 import BaseCard from '../../components/ui/BaseCard.vue'
 import BaseButton from '../../components/ui/BaseButton.vue'
 import { useQuizApiStore } from '../../stores/quiz'
 import { useGameStore } from '../../stores/game'
+import { STORAGE_KEYS } from '../../api/http'
 
 const router = useRouter()
 const quizStore = useQuizApiStore()
@@ -21,7 +22,18 @@ const gameStore = useGameStore()
 const creando = ref(false)
 const PALETA = ['bg-coral', 'bg-azul', 'bg-dorado', 'bg-esmeralda']
 
+// Partida en curso que el host dejó a medias (sessionStorage, ver stores/game).
+const partidaEnCurso = ref(sessionStorage.getItem(STORAGE_KEYS.hostActivePin))
+
 onMounted(() => quizStore.fetchQuizzes())
+
+function retomar() {
+  router.push(`/host/${partidaEnCurso.value}`)
+}
+function descartar() {
+  sessionStorage.removeItem(STORAGE_KEYS.hostActivePin)
+  partidaEnCurso.value = null
+}
 
 async function crear() {
   creando.value = true
@@ -55,6 +67,22 @@ async function eliminar(quiz) {
 
 <template>
   <TeacherLayout>
+    <!-- Aviso de partida en curso (el host se fue sin terminarla) -->
+    <div
+      v-if="partidaEnCurso"
+      class="mb-5 bg-marino text-white rounded-xl px-5 py-3 flex items-center gap-3"
+    >
+      <Radio :size="20" class="text-esmeralda animate-pulse shrink-0" />
+      <div class="flex-1">
+        <p class="font-semibold text-sm">Tenés una partida en curso · PIN {{ partidaEnCurso }}</p>
+        <p class="text-white/50 text-xs">Podés volver a la proyección donde la dejaste.</p>
+      </div>
+      <BaseButton variant="success" size="sm" @click="retomar">Retomar</BaseButton>
+      <button @click="descartar" class="text-white/40 hover:text-white transition-colors" title="Descartar aviso">
+        <X :size="18" />
+      </button>
+    </div>
+
     <div class="flex items-center justify-between mb-6">
       <div>
         <h1 class="text-2xl font-extrabold text-marino">Mis Cuestionarios</h1>

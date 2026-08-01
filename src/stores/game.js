@@ -7,6 +7,7 @@
 */
 import { defineStore } from 'pinia'
 import { gamesApi } from '../api/games'
+import { STORAGE_KEYS } from '../api/http'
 import { getEcho } from '../realtime/echo'
 
 export const useGameStore = defineStore('game', {
@@ -58,6 +59,9 @@ export const useGameStore = defineStore('game', {
     /** Rehidratación completa desde /state (URL directa o F5 del host). */
     async hydrate(pin) {
       const st = await gamesApi.state(pin)
+      // Recordá que hay una partida en curso para poder "retomarla" desde el
+      // dashboard si el host se va sin terminarla (sessionStorage: solo esta pestaña).
+      sessionStorage.setItem(STORAGE_KEYS.hostActivePin, pin)
       this.pin = pin
       this.state = st.state
       this.stateVersion = st.state_version
@@ -154,7 +158,13 @@ export const useGameStore = defineStore('game', {
     /** Aborta la partida y desarma la sala (X del host). */
     async end() {
       try { await gamesApi.end(this.pin) } catch { /* ya estaba cerrada */ }
+      sessionStorage.removeItem(STORAGE_KEYS.hostActivePin)
       this.reset()
+    },
+
+    /** La partida terminó normalmente (podium → ended): limpiar el marcador. */
+    clearActive() {
+      sessionStorage.removeItem(STORAGE_KEYS.hostActivePin)
     },
 
     async toggleLock() {

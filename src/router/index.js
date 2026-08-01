@@ -44,6 +44,18 @@ const router = createRouter({
       component: () => import('../views/host/HostGame.vue'),
       meta: { requiresAuth: true },
     },
+    {
+      path: '/reportes',
+      name: 'reportes',
+      component: () => import('../views/host/ReportsList.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/reportes/:id',
+      name: 'reporte',
+      component: () => import('../views/host/ReportDetail.vue'),
+      meta: { requiresAuth: true },
+    },
 
     { path: '/:pathMatch(.*)*', redirect: '/play' },
   ],
