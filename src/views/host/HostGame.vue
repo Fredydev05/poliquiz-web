@@ -13,7 +13,7 @@ import QRCode from 'qrcode'
 import confetti from 'canvas-confetti'
 import {
   Users, Play, X, Lock, LockOpen, UserX, Loader, Wifi, Timer,
-  SkipForward, Square, Trophy, Check,
+  SkipForward, Square, Trophy, Check, Maximize2,
 } from 'lucide-vue-next'
 import BrandLogo from '../../components/ui/BrandLogo.vue'
 import BaseButton from '../../components/ui/BaseButton.vue'
@@ -27,7 +27,9 @@ const game = useGameStore()
 const timer = useServerTimer()
 
 const cargando = ref(true)
-const qrDataUrl = ref(null)
+const qrDataUrl = ref(null)      // chico, para la tarjeta del lobby
+const qrDataUrlGrande = ref(null) // alta resolución, para el modal expandido
+const showQrModal = ref(false)
 
 /* Colores y formas Kahoot por índice de opción. */
 const estilos = [
@@ -51,11 +53,13 @@ onMounted(async () => {
     return
   }
   qrDataUrl.value = await QRCode.toDataURL(game.joinUrl, { width: 220, margin: 1 })
+  qrDataUrlGrande.value = await QRCode.toDataURL(game.joinUrl, { width: 640, margin: 1 })
   cargando.value = false
   // Si el host entró con una pregunta ya corriendo (refresh), re-sincronizar.
   if (game.state === 'question') {
     timer.sync(game.endsAtMs, game.serverNowMs, game.question.time_limit)
   }
+  window.addEventListener('keydown', cerrarModalConEscape)
 })
 
 // Al terminar normalmente (podium → ended) dejamos de ofrecer "retomar".
@@ -68,7 +72,12 @@ async function terminar() {
 onUnmounted(() => {
   detenerConfeti()
   game.reset()
+  window.removeEventListener('keydown', cerrarModalConEscape)
 })
+
+function cerrarModalConEscape(e) {
+  if (e.key === 'Escape') showQrModal.value = false
+}
 
 // El temporizador arranca/re-arranca cuando el servidor lanza la pregunta.
 watch(() => game.state, (estado) => {
@@ -162,10 +171,19 @@ function detenerConfeti() {
           </p>
           <p class="text-white/50 text-sm mt-3">{{ game.quizTitle }} · {{ game.questionsTotal }} preguntas</p>
         </div>
-        <div class="bg-white rounded-2xl p-3 shadow-2xl">
-          <img v-if="qrDataUrl" :src="qrDataUrl" alt="QR para unirse" class="w-44 h-44" />
+        <button
+          v-if="qrDataUrl"
+          @click="showQrModal = true"
+          class="group relative bg-white rounded-2xl p-3 shadow-2xl transition-transform hover:scale-[1.03] active:scale-95"
+          title="Ampliar código QR"
+        >
+          <img :src="qrDataUrl" alt="QR para unirse" class="w-44 h-44" />
           <p class="text-marino text-[10px] text-center font-semibold -mt-1">escaneá para entrar</p>
-        </div>
+          <!-- Overlay "ampliar" al pasar el mouse (gesto solo decorativo: en celular ya es táctil) -->
+          <span class="absolute inset-0 rounded-2xl bg-marino/0 group-hover:bg-marino/5 flex items-center justify-center transition-colors">
+            <Maximize2 :size="22" class="text-marino opacity-0 group-hover:opacity-60 transition-opacity" />
+          </span>
+        </button>
       </div>
 
       <div class="flex flex-wrap justify-center gap-2 max-w-2xl min-h-12">
@@ -346,10 +364,46 @@ function detenerConfeti() {
         Terminar y volver al dashboard
       </BaseButton>
     </div>
+
+    <!-- ═════════ MODAL · QR AMPLIADO ═════════
+         QR de alta resolución (640px, no un zoom CSS del chico) para que se
+         pueda escanear cómodo desde el fondo del aula. Cierra con click
+         afuera, la X o Escape. -->
+    <div
+      v-if="showQrModal"
+      class="fixed inset-0 bg-marino/80 backdrop-blur-sm z-50 flex items-center justify-center p-6 anim-qr-backdrop"
+      @click.self="showQrModal = false"
+    >
+      <div class="bg-white rounded-3xl p-8 shadow-2xl flex flex-col items-center gap-4 anim-qr-modal max-w-full">
+        <button
+          @click="showQrModal = false"
+          class="self-end -mt-4 -mr-4 text-slate-400 hover:text-marino transition-colors"
+          title="Cerrar (Esc)"
+        >
+          <X :size="24" />
+        </button>
+        <img
+          v-if="qrDataUrlGrande"
+          :src="qrDataUrlGrande"
+          alt="QR para unirse (ampliado)"
+          class="w-[min(72vw,420px)] h-[min(72vw,420px)] -mt-6"
+        />
+        <p class="text-marino font-bold text-lg text-center">Escaneá para entrar</p>
+        <p class="text-marino/60 text-sm font-semibold tabular-nums tracking-[0.2em]">PIN {{ game.pin }}</p>
+      </div>
+    </div>
   </div>
 </template>
 
 <style scoped>
+/* Modal del QR ampliado: fondo con fade, tarjeta con pop sutil */
+@keyframes qr-backdrop-entra { from { opacity: 0; } }
+@keyframes qr-modal-entra {
+  from { opacity: 0; transform: scale(0.94); }
+}
+.anim-qr-backdrop { animation: qr-backdrop-entra 150ms ease; }
+.anim-qr-modal { animation: qr-modal-entra 200ms cubic-bezier(0.23, 1, 0.32, 1); }
+
 /* Píldoras del lobby */
 @keyframes pop-entra {
   from { opacity: 0; transform: scale(0.6) translateY(8px); }
@@ -384,5 +438,6 @@ function detenerConfeti() {
 @media (prefers-reduced-motion: reduce) {
   .anim-pop, .anim-preparate, .anim-fila { animation: none; }
   .anim-podio-columna { animation: podio-aparece 200ms ease both; }
+  .anim-qr-backdrop, .anim-qr-modal { animation: none; }
 }
 </style>
