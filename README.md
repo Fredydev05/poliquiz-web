@@ -10,11 +10,14 @@ Maqueta interactiva de una plataforma de trivias estilo **Kahoot!** para la **Fa
 
 ## Comandos
 
+Este proyecto usa **pnpm** (`corepack enable` o `npm i -g pnpm` si no lo tenés):
+
 ```bash
-npm install      # instalar dependencias
-npm run dev      # levantar en desarrollo → http://localhost:5173
-npm run build    # compilar para producción (carpeta dist/)
-npm run preview  # servir el build de producción
+pnpm install     # instalar dependencias
+pnpm dev         # levantar en desarrollo → http://localhost:5173
+pnpm build       # compilar para producción (carpeta dist/)
+pnpm preview     # servir el build de producción
+pnpm test        # correr los tests (Vitest)
 ```
 
 ## Cómo probar la demo
