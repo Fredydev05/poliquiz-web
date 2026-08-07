@@ -1,2 +1,10 @@
-onlyBuiltDependencies:
-  - esbuild
+# Bloquea los scripts de instalación (preinstall/install/postinstall) de TODAS
+# las dependencias. Es la defensa contra ataques de cadena de suministro como
+# Shai-Hulud (npm, agosto 2026), cuyo payload se ejecuta justo en ese momento.
+#
+# Nuestro build no necesita ningún script de dependencia: esbuild (la única con
+# postinstall) trae su binario nativo por dependencia opcional según plataforma
+# (@esbuild/<os>-<arch>), así que Vite compila igual sin correr su script.
+#
+# Nota: en pnpm 11 la configuración vive acá, NO en .npmrc (pnpm 11 ya no lo lee).
+ignoreScripts: true
