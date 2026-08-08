@@ -12,9 +12,9 @@ const route = useRoute()
 </script>
 
 <template>
-  <div class="min-h-screen bg-slate-100">
+  <div class="h-screen flex flex-col bg-slate-100">
     <!-- Barra de navegación de desarrollo -->
-    <nav class="bg-marino/95 backdrop-blur px-4 py-2.5 flex items-center justify-center gap-3 text-sm sticky top-0 z-10 border-b border-white/10">
+    <nav class="bg-marino/95 backdrop-blur px-4 py-2.5 flex items-center justify-center gap-3 text-sm sticky top-0 z-10 border-b border-white/10 shrink-0">
       <span class="text-white/50 text-xs uppercase tracking-wider hidden sm:block">POLI Quiz · dev</span>
       <RouterLink
         to="/play"
@@ -45,8 +45,13 @@ const route = useRoute()
       </div>
     </nav>
 
-    <!-- Cada cambio de ruta entra con la animación de pantalla -->
-    <div :key="route.fullPath" class="animar-pantalla">
+    <!-- Cada cambio de ruta entra con la animación de pantalla.
+         flex-1 min-h-0 + overflow-y-auto: la altura restante bajo el nav la
+         calcula el navegador (nunca un "100vh - Npx" que se desincroniza del
+         alto real del nav), y el scroll de página queda contenido acá en vez
+         de en el <body> — las vistas de una sola columna se ven idénticas;
+         TeacherEditor puede usar h-full sin números mágicos. -->
+    <div :key="route.fullPath" class="animar-pantalla flex-1 min-h-0 overflow-y-auto">
       <RouterView />
     </div>
   </div>
