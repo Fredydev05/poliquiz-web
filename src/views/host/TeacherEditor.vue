@@ -19,6 +19,7 @@ import {
   CloudUpload, ChevronDown, Sparkles, Award, AlertTriangle, Loader,
 } from 'lucide-vue-next'
 import BaseButton from '../../components/ui/BaseButton.vue'
+import AssistantPanel from './AssistantPanel.vue'
 import { useQuizApiStore, esPreguntaCompleta } from '../../stores/quiz'
 
 const route = useRoute()
@@ -147,15 +148,18 @@ async function onImagenElegida(event) {
 /* ------------------------------ Vista previa ------------------------------ */
 const showPreview = ref(false)
 const etiquetaTiempo = (v) => TIEMPOS.find((t) => t.value === v)?.label ?? v + 's'
+
+/* ------------------------------ Asistente IA ------------------------------ */
+const showAssistant = ref(false)
 </script>
 
 <template>
   <!-- Estado de carga inicial -->
-  <div v-if="cargando" class="min-h-[calc(100vh-52px)] flex items-center justify-center text-slate-400">
+  <div v-if="cargando" class="h-full flex items-center justify-center text-slate-400">
     <Loader :size="32" class="animate-spin" />
   </div>
 
-  <div v-else-if="quiz" class="min-h-[calc(100vh-52px)] flex flex-col bg-slate-100">
+  <div v-else-if="quiz" class="h-full flex flex-col bg-slate-100 overflow-hidden">
 
     <!-- ════════════════════ BARRA SUPERIOR ════════════════════ -->
     <header class="bg-white border-b border-slate-200 px-4 py-2 flex items-center gap-3 shrink-0">
@@ -187,6 +191,14 @@ const etiquetaTiempo = (v) => TIEMPOS.find((t) => t.value === v)?.label ?? v + '
         </template>
       </span>
 
+      <button
+        @click="showAssistant = true"
+        class="flex items-center gap-1.5 text-sm font-semibold rounded-lg px-3 py-1.5 text-dorado
+               bg-dorado/15 hover:bg-dorado/25 transition-colors cursor-pointer"
+      >
+        <img src="/icons8-ai-48.png" class="w-4 h-4" /> Mejorá tu Quiz
+        <!--<Sparkles :size="15" class="text-dorado" /> Asistente IA-->
+      </button>
       <BaseButton variant="ghost" size="sm" class="!text-slate-600 !bg-slate-100 hover:!bg-slate-200" @click="showPreview = true" :disabled="!item">
         <Eye :size="15" /> Vista previa
       </BaseButton>
@@ -267,90 +279,92 @@ const etiquetaTiempo = (v) => TIEMPOS.find((t) => t.value === v)?.label ?? v + '
 
       <!-- ════════════════ LIENZO CENTRAL ════════════════ -->
       <main class="flex-1 overflow-y-auto p-6" v-if="item">
-        <div class="max-w-3xl mx-auto space-y-5">
+        <div class="max-w-5xl mx-auto h-full flex flex-col gap-5">
 
           <input
             v-model="item.title"
             placeholder="Escribí tu pregunta…"
             class="w-full bg-white text-xl lg:text-2xl font-extrabold text-marino text-center rounded-xl
                    shadow-sm border border-slate-200 px-5 py-4 focus:outline-none focus:ring-2 focus:ring-marino
-                   placeholder:text-slate-300"
+                   placeholder:text-slate-300 shrink-0"
           />
 
+          <div class="flex justify-between flex-1 min-h-0 flex-col">
           <!-- ───── Imagen de la pregunta (subida real a la API) ───── -->
-          <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-            <div v-if="item.media" class="relative flex justify-center">
-              <img :src="item.media.url" class="max-h-56 rounded-lg object-contain" alt="imagen de la pregunta" />
-              <button @click="item.media = null" class="absolute -top-2 -right-2 bg-marino text-white rounded-full p-1 shadow-md hover:bg-coral transition-colors" title="Quitar imagen">
-                <X :size="14" />
-              </button>
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+              <div v-if="item.media" class="relative flex justify-center">
+                <img :src="item.media.url" class="max-h-60 rounded-lg object-contain" alt="imagen de la pregunta" />
+                <button @click="item.media = null" class="absolute -top-2 -right-2 bg-marino text-white rounded-full p-1 shadow-md hover:bg-coral transition-colors" title="Quitar imagen">
+                  <X :size="14" />
+                </button>
+              </div>
+
+              <div v-else class="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center">
+                <p class="text-sm text-slate-400 mb-3">Agregá una imagen a la pregunta (opcional)</p>
+                <input ref="inputImagen" type="file" accept="image/jpeg,image/png,image/webp,image/gif" class="hidden" @change="onImagenElegida" />
+                <BaseButton variant="ghost" size="sm" class="!bg-slate-100 !text-slate-600 hover:!bg-slate-200"
+                            :disabled="subiendoImagen" @click="inputImagen.click()">
+                  <Loader v-if="subiendoImagen" :size="15" class="animate-spin" />
+                  <ImageIcon v-else :size="15" />
+                  {{ subiendoImagen ? 'Subiendo…' : 'Subir imagen' }}
+                </BaseButton>
+                <p class="text-[10px] text-slate-300 mt-2">JPG, PNG, WebP o GIF · máx 2 MB</p>
+              </div>
             </div>
 
-            <div v-else class="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center">
-              <p class="text-sm text-slate-400 mb-3">Agregá una imagen a la pregunta (opcional)</p>
-              <input ref="inputImagen" type="file" accept="image/jpeg,image/png,image/webp,image/gif" class="hidden" @change="onImagenElegida" />
-              <BaseButton variant="ghost" size="sm" class="!bg-slate-100 !text-slate-600 hover:!bg-slate-200"
-                          :disabled="subiendoImagen" @click="inputImagen.click()">
-                <Loader v-if="subiendoImagen" :size="15" class="animate-spin" />
-                <ImageIcon v-else :size="15" />
-                {{ subiendoImagen ? 'Subiendo…' : 'Subir imagen' }}
-              </BaseButton>
-              <p class="text-[10px] text-slate-300 mt-2">JPG, PNG, WebP o GIF · máx 2 MB</p>
-            </div>
-          </div>
+            <!-- ───── Opciones (según tipo) ───── -->
 
-          <!-- ───── Opciones (según tipo) ───── -->
-
-          <!-- QUIZ: 4 opciones de colores -->
-          <div v-if="item.kind === 'quiz'" class="grid sm:grid-cols-2 gap-3">
-            <div
-              v-for="(op, i) in item.options" :key="i"
-              class="flex items-center gap-3 rounded-xl p-3 shadow-sm"
-              :class="coloresOpcion[i]"
-            >
-              <svg viewBox="0 0 100 100" class="w-6 h-6 shrink-0 fill-white">
-                <polygon v-if="formasOpcion[i] === 'triangulo'" points="50,12 88,86 12,86" />
-                <polygon v-else-if="formasOpcion[i] === 'rombo'" points="50,8 92,50 50,92 8,50" />
-                <circle v-else-if="formasOpcion[i] === 'circulo'" cx="50" cy="50" r="36" />
-                <rect v-else x="18" y="18" width="64" height="64" rx="6" />
-              </svg>
-              <input
-                v-model="op.text"
-                :placeholder="'Añadir respuesta ' + (i + 1) + (i >= 2 ? ' (opcional)' : '')"
-                class="flex-1 bg-white/95 rounded-lg px-3 py-2.5 text-slate-800 placeholder:text-slate-400 focus:outline-none"
-              />
-              <button
-                @click="item.multi ? toggleCorrect(i) : setCorrect(i)"
-                class="w-7 h-7 rounded-full border-2 border-white flex items-center justify-center transition-all shrink-0"
-                :class="op.correct ? 'bg-white' : 'bg-transparent hover:bg-white/20'"
-                :title="op.correct ? 'Respuesta correcta' : 'Marcar como correcta'"
+            <!-- QUIZ: 4 opciones de colores -->
+            <div v-if="item.kind === 'quiz'" class="grid sm:grid-cols-2 gap-3">
+              <div
+                v-for="(op, i) in item.options" :key="i"
+                class="flex items-center gap-3 rounded-xl p-4 shadow-sm"
+                :class="coloresOpcion[i]"
               >
-                <Check v-if="op.correct" :size="16" class="text-esmeralda" stroke-width="3.5" />
-              </button>
-            </div>
-          </div>
-
-          <!-- VERDADERO / FALSO -->
-          <div v-else-if="item.kind === 'tf'" class="grid sm:grid-cols-2 gap-3">
-            <div
-              v-for="(op, i) in item.options" :key="i"
-              class="flex items-center justify-between gap-3 rounded-xl p-5 shadow-sm text-white font-bold text-lg"
-              :class="i === 0 ? 'bg-azul' : 'bg-coral'"
-            >
-              <span class="flex items-center gap-2.5">
-                <svg viewBox="0 0 100 100" class="w-6 h-6 fill-white">
-                  <polygon v-if="i === 0" points="50,8 92,50 50,92 8,50" />
-                  <polygon v-else points="50,12 88,86 12,86" />
+                <svg viewBox="0 0 100 100" class="w-6 h-6 shrink-0 fill-white">
+                  <polygon v-if="formasOpcion[i] === 'triangulo'" points="50,12 88,86 12,86" />
+                  <polygon v-else-if="formasOpcion[i] === 'rombo'" points="50,8 92,50 50,92 8,50" />
+                  <circle v-else-if="formasOpcion[i] === 'circulo'" cx="50" cy="50" r="36" />
+                  <rect v-else x="18" y="18" width="64" height="64" rx="6" />
                 </svg>
-                {{ op.text }}
-              </span>
-              <button
-                @click="setCorrect(i)"
-                class="w-7 h-7 rounded-full border-2 border-white flex items-center justify-center transition-all"
-                :class="op.correct ? 'bg-white' : 'hover:bg-white/20'"
+                <input
+                  v-model="op.text"
+                  :placeholder="'Añadir respuesta ' + (i + 1) + (i >= 2 ? ' (opcional)' : '')"
+                  class="flex-1 text-white rounded-lg px-3 py-2.5 font-bold  focus:outline-none"
+                />
+                <button
+                  @click="item.multi ? toggleCorrect(i) : setCorrect(i)"
+                  class="w-7 h-7 rounded-full border-2 border-white flex items-center justify-center transition-all shrink-0"
+                  :class="op.correct ? 'bg-white' : 'bg-transparent hover:bg-white/20'"
+                  :title="op.correct ? 'Respuesta correcta' : 'Marcar como correcta'"
+                >
+                  <Check v-if="op.correct" :size="16" class="text-esmeralda" stroke-width="3.5" />
+                </button>
+              </div>
+            </div>
+
+            <!-- VERDADERO / FALSO -->
+            <div v-else-if="item.kind === 'tf'" class="grid sm:grid-cols-2 gap-3">
+              <div
+                v-for="(op, i) in item.options" :key="i"
+                class="flex items-center justify-between gap-3 rounded-xl p-5 shadow-sm text-white font-bold text-lg"
+                :class="i === 0 ? 'bg-azul' : 'bg-coral'"
               >
-                <Check v-if="op.correct" :size="16" class="text-esmeralda" stroke-width="3.5" />
-              </button>
+                <span class="flex items-center gap-2.5">
+                  <svg viewBox="0 0 100 100" class="w-6 h-6 fill-white">
+                    <polygon v-if="i === 0" points="50,8 92,50 50,92 8,50" />
+                    <polygon v-else points="50,12 88,86 12,86" />
+                  </svg>
+                  {{ op.text }}
+                </span>
+                <button
+                  @click="setCorrect(i)"
+                  class="w-7 h-7 rounded-full border-2 border-white flex items-center justify-center transition-all"
+                  :class="op.correct ? 'bg-white' : 'hover:bg-white/20'"
+                >
+                  <Check v-if="op.correct" :size="16" class="text-esmeralda" stroke-width="3.5" />
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -504,6 +518,9 @@ const etiquetaTiempo = (v) => TIEMPOS.find((t) => t.value === v)?.label ?? v + '
         </div>
       </div>
     </div>
+
+    <!-- ════════════════ PANEL · ASISTENTE IA ════════════════ -->
+    <AssistantPanel :open="showAssistant" :quiz-id="quiz.id" @close="showAssistant = false" />
   </div>
 </template>
 
