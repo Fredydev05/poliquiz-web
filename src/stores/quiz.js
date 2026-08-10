@@ -191,6 +191,26 @@ export const useQuizApiStore = defineStore('quiz', {
       return item.id
     },
 
+    /**
+     * Inserta las preguntas que generó la IA (formato API) al final del
+     * borrador, traduciéndolas al formato del editor. Devuelve cuántas insertó.
+     */
+    insertGeneratedQuestions(apiQuestions) {
+      const nuevas = (apiQuestions ?? []).map((q) => ({
+        id: localId++,
+        kind: q.kind === 'true_false' ? 'tf' : 'quiz',
+        multi: q.kind === 'multi',
+        title: q.title,
+        timeLimit: q.time_limit,
+        points: q.points_mode ?? 'standard',
+        media: null,
+        text: '',
+        options: padOptions(q),
+      }))
+      this.editing.questions.push(...nuevas)
+      return nuevas.length
+    },
+
     duplicateItem(itemId) {
       const list = this.editing.questions
       const idx = list.findIndex((it) => it.id === itemId)

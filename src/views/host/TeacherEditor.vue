@@ -19,6 +19,7 @@ import {
   CloudUpload, ChevronDown, Sparkles, Award, AlertTriangle, Loader,
 } from 'lucide-vue-next'
 import BaseButton from '../../components/ui/BaseButton.vue'
+import AssistantPanel from './AssistantPanel.vue'
 import { useQuizApiStore, esPreguntaCompleta } from '../../stores/quiz'
 
 const route = useRoute()
@@ -147,6 +148,9 @@ async function onImagenElegida(event) {
 /* ------------------------------ Vista previa ------------------------------ */
 const showPreview = ref(false)
 const etiquetaTiempo = (v) => TIEMPOS.find((t) => t.value === v)?.label ?? v + 's'
+
+/* ------------------------------ Asistente IA ------------------------------ */
+const showAssistant = ref(false)
 </script>
 
 <template>
@@ -187,6 +191,14 @@ const etiquetaTiempo = (v) => TIEMPOS.find((t) => t.value === v)?.label ?? v + '
         </template>
       </span>
 
+      <button
+        @click="showAssistant = true"
+        class="flex items-center gap-1.5 text-sm font-semibold rounded-lg px-3 py-1.5 text-dorado
+               bg-dorado/15 hover:bg-dorado/25 transition-colors cursor-pointer"
+      >
+        <img src="/icons8-ai-48.png" class="w-4 h-4" /> Mejorá tu Quiz
+        <!--<Sparkles :size="15" class="text-dorado" /> Asistente IA-->
+      </button>
       <BaseButton variant="ghost" size="sm" class="!text-slate-600 !bg-slate-100 hover:!bg-slate-200" @click="showPreview = true" :disabled="!item">
         <Eye :size="15" /> Vista previa
       </BaseButton>
@@ -506,6 +518,9 @@ const etiquetaTiempo = (v) => TIEMPOS.find((t) => t.value === v)?.label ?? v + '
         </div>
       </div>
     </div>
+
+    <!-- ════════════════ PANEL · ASISTENTE IA ════════════════ -->
+    <AssistantPanel :open="showAssistant" :quiz-id="quiz.id" @close="showAssistant = false" />
   </div>
 </template>
 
