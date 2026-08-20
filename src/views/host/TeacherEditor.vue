@@ -16,7 +16,7 @@ import {
   ArrowLeft, Plus, Check, Clock, Trash2, Copy, GripVertical, X, Eye,
   Image as ImageIcon, LayoutGrid, Scale, Type, Puzzle,
   BarChart3, Cloud, MessageSquareText, Lightbulb, Save,
-  CloudUpload, ChevronDown, Sparkles, Award, AlertTriangle, Loader,
+  CloudUpload, ChevronDown, Sparkles, Award, AlertTriangle, Loader, Presentation, ArrowUp, ArrowDown,
 } from 'lucide-vue-next'
 import BaseButton from '../../components/ui/BaseButton.vue'
 import AssistantPanel from './AssistantPanel.vue'
@@ -30,9 +30,10 @@ const quizStore = useQuizApiStore()
 const TIPOS = {
   quiz: { label: 'Quiz', icon: LayoutGrid, v1: true, desc: 'Hasta 4 opciones de colores; simple o selección múltiple' },
   tf: { label: 'Verdadero o falso', icon: Scale, v1: true, desc: 'Dos opciones fijas: Verdadero / Falso' },
-  short: { label: 'Respuesta corta', icon: Type, v1: false, desc: 'Llega en la versión 2' },
-  puzzle: { label: 'Puzzle', icon: Puzzle, v1: false, desc: 'Llega en la versión 2' },
-  poll: { label: 'Encuesta', icon: BarChart3, v1: false, desc: 'Llega en la versión 2' },
+  short: { label: 'Escribe la respuesta', icon: Type, v1: true, desc: 'El alumno escribe; cargás una o varias respuestas aceptadas' },
+  puzzle: { label: 'Rompecabezas', icon: Puzzle, v1: true, desc: 'El alumno ordena las piezas; vos definís el orden correcto' },
+  poll: { label: 'Encuesta', icon: BarChart3, v1: true, desc: 'Recoge opiniones; sin respuesta correcta ni puntos' },
+  slide: { label: 'Diapositiva', icon: Presentation, v1: true, desc: 'Contenido para proyectar entre preguntas; sin interacción' },
   wordcloud: { label: 'Nube de palabras', icon: Cloud, v1: false, desc: 'Llega en la versión 2' },
   open: { label: 'Pregunta abierta', icon: MessageSquareText, v1: false, desc: 'Llega en la versión 2' },
   brainstorm: { label: 'Lluvia de ideas', icon: Lightbulb, v1: false, desc: 'Llega en la versión 2' },
@@ -127,6 +128,13 @@ function setCorrect(i) {
 }
 function toggleCorrect(i) {
   item.value.options[i].correct = !item.value.options[i].correct
+}
+/** Rompecabezas: sube/baja una pieza en el orden correcto. */
+function moverPieza(i, dir) {
+  const ops = item.value.options
+  const j = i + dir
+  if (j < 0 || j >= ops.length) return
+  ;[ops[i], ops[j]] = [ops[j], ops[i]]
 }
 
 /* ------------------------- Imagen de la pregunta ------------------------- */
@@ -283,7 +291,7 @@ const showAssistant = ref(false)
 
           <input
             v-model="item.title"
-            placeholder="Escribí tu pregunta…"
+            :placeholder="item.kind === 'slide' ? 'Título de la diapositiva…' : 'Escribí tu pregunta…'"
             class="w-full bg-white text-xl lg:text-2xl font-extrabold text-marino text-center rounded-xl
                    shadow-sm border border-slate-200 px-5 py-4 focus:outline-none focus:ring-2 focus:ring-marino
                    placeholder:text-slate-300 shrink-0"
@@ -366,6 +374,63 @@ const showAssistant = ref(false)
                 </button>
               </div>
             </div>
+
+            <!-- ENCUESTA: 4 opciones de colores, SIN marcar correcta -->
+            <div v-else-if="item.kind === 'poll'" class="grid sm:grid-cols-2 gap-3">
+              <div v-for="(op, i) in item.options" :key="i" class="flex items-center gap-3 rounded-xl p-4 shadow-sm" :class="coloresOpcion[i]">
+                <svg viewBox="0 0 100 100" class="w-6 h-6 shrink-0 fill-white">
+                  <polygon v-if="formasOpcion[i] === 'triangulo'" points="50,12 88,86 12,86" />
+                  <polygon v-else-if="formasOpcion[i] === 'rombo'" points="50,8 92,50 50,92 8,50" />
+                  <circle v-else-if="formasOpcion[i] === 'circulo'" cx="50" cy="50" r="36" />
+                  <rect v-else x="18" y="18" width="64" height="64" rx="6" />
+                </svg>
+                <input v-model="op.text" :placeholder="'Opción ' + (i + 1) + (i >= 2 ? ' (opcional)' : '')" class="flex-1 text-white rounded-lg px-3 py-2.5 font-bold focus:outline-none" />
+              </div>
+            </div>
+
+            <!-- ESCRIBE LA RESPUESTA: respuestas aceptadas -->
+            <div v-else-if="item.kind === 'short'" class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 space-y-2">
+              <p class="text-sm font-semibold text-slate-600 mb-1">
+                Respuestas aceptadas
+                <span class="font-normal text-slate-400">(cualquiera cuenta como correcta; se ignoran mayúsculas y acentos)</span>
+              </p>
+              <div v-for="(op, i) in item.options" :key="i" class="flex items-center gap-2">
+                <Check :size="16" class="text-esmeralda shrink-0" />
+                <input
+                  v-model="op.text"
+                  :placeholder="'Respuesta aceptada ' + (i + 1) + (i > 0 ? ' (opcional)' : '')"
+                  class="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-marino"
+                />
+              </div>
+            </div>
+
+            <!-- ROMPECABEZAS: piezas en el orden correcto -->
+            <div v-else-if="item.kind === 'puzzle'" class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 space-y-2">
+              <p class="text-sm font-semibold text-slate-600 mb-1">
+                Colocá las piezas en el <strong>orden correcto</strong>
+                <span class="font-normal text-slate-400">— los alumnos las verán mezcladas</span>
+              </p>
+              <div v-for="(op, i) in item.options" :key="i" class="flex items-center gap-2">
+                <span class="w-8 h-8 rounded-lg text-white font-bold flex items-center justify-center shrink-0" :class="coloresOpcion[i]">{{ i + 1 }}</span>
+                <input
+                  v-model="op.text"
+                  :placeholder="'Pieza ' + (i + 1) + (i >= 2 ? ' (opcional)' : '')"
+                  class="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-marino"
+                />
+                <button @click="moverPieza(i, -1)" :disabled="i === 0" class="text-slate-400 hover:text-marino disabled:opacity-20 p-1" title="Subir"><ArrowUp :size="15" /></button>
+                <button @click="moverPieza(i, 1)" :disabled="i === item.options.length - 1" class="text-slate-400 hover:text-marino disabled:opacity-20 p-1" title="Bajar"><ArrowDown :size="15" /></button>
+              </div>
+            </div>
+
+            <!-- DIAPOSITIVA: cuerpo de texto que se proyecta -->
+            <div v-else-if="item.kind === 'slide'">
+              <textarea
+                v-model="item.body"
+                rows="6"
+                placeholder="Escribí el contenido de la diapositiva… (se proyecta entre preguntas, sin interacción)"
+                class="w-full rounded-xl border border-slate-200 shadow-sm px-4 py-3 text-slate-700 focus:outline-none focus:ring-2 focus:ring-marino resize-none"
+              ></textarea>
+            </div>
           </div>
         </div>
       </main>
@@ -397,7 +462,7 @@ const showAssistant = ref(false)
           </button>
         </div>
 
-        <div>
+        <div v-if="item.kind !== 'slide'">
           <label class="flex items-center gap-1.5 text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">
             <Clock :size="14" /> Límite de tiempo
           </label>
@@ -409,7 +474,8 @@ const showAssistant = ref(false)
           </select>
         </div>
 
-        <div>
+        <!-- La encuesta y la diapositiva no puntúan. -->
+        <div v-if="item.kind !== 'slide' && item.kind !== 'poll'">
           <label class="flex items-center gap-1.5 text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">
             <Award :size="14" /> Puntos
           </label>

@@ -15,11 +15,18 @@ export const useGameStore = defineStore('game', {
     pin: null,
     quizTitle: '',
     questionsTotal: 0,
-    state: 'lobby',          // lobby | get_ready | question | results | leaderboard | podium
+    state: 'lobby',          // lobby | get_ready | question | results | leaderboard | slide | podium
     stateVersion: 0,
     locked: false,
     players: [],             // [{uuid, nickname, connected}]
     channel: null,
+
+    // --- reveal (get_ready muestra el enunciado antes de las opciones) ---
+    revealTitle: '',
+    revealImage: null,
+
+    // --- diapositiva en pantalla ---
+    slide: null,             // {title, body, image_url}
 
     // --- pregunta en curso ---
     currentIndex: -1,
@@ -30,6 +37,7 @@ export const useGameStore = defineStore('game', {
     answeredCount: 0,
 
     // --- revelación / ranking ---
+    reveal: null,            // payload de reveal del tipo actual (options|text|order)
     correctOptionIds: [],
     distribution: [],        // [{option_id, count}]
     top: [],                 // [{uuid, nickname, score, delta}]
@@ -80,6 +88,14 @@ export const useGameStore = defineStore('game', {
       if (st.state === 'results' && st.question) {
         this.correctOptionIds = st.question.options.filter((o) => o.is_correct).map((o) => o.id)
       }
+      // Reconexión durante una diapositiva o el reveal: reconstruir el contenido.
+      if (st.state === 'slide' && st.question) {
+        this.slide = { title: st.question.title, body: st.question.body ?? null, image_url: st.question.image_url ?? null }
+      }
+      if (st.state === 'get_ready' && st.question) {
+        this.revealTitle = st.question.title
+        this.revealImage = st.question.image_url ?? null
+      }
       this.connect()
     },
 
@@ -114,9 +130,17 @@ export const useGameStore = defineStore('game', {
           if (!this._fresh(e.state_version)) return
           this.state = 'get_ready'
           this.currentIndex = e.index
+          this.revealTitle = e.title           // el enunciado ya se muestra en el reveal
+          this.revealImage = e.image_url ?? null
           this.answeredCount = 0
           this.correctOptionIds = []
           this.distribution = []
+        })
+        .listen('.SlideShown', (e) => {
+          if (!this._fresh(e.state_version)) return
+          this.state = 'slide'
+          this.currentIndex = e.index
+          this.slide = { title: e.title, body: e.body, image_url: e.image_url }
         })
         .listen('.QuestionStarted', (e) => {
           if (!this._fresh(e.state_version)) return
@@ -129,8 +153,9 @@ export const useGameStore = defineStore('game', {
         .listen('.QuestionEnded', (e) => {
           if (!this._fresh(e.state_version)) return
           this.state = 'results'
-          this.correctOptionIds = e.correct_option_ids
-          this.distribution = e.distribution
+          this.reveal = e.reveal                              // {kind, ...} según el tipo
+          this.correctOptionIds = e.reveal.correct_option_ids ?? []
+          this.distribution = e.reveal.distribution ?? []
         })
         .listen('.LeaderboardShown', (e) => {
           if (!this._fresh(e.state_version)) return

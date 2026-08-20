@@ -25,6 +25,25 @@ const PALETA = ['bg-coral', 'bg-azul', 'bg-dorado', 'bg-esmeralda']
 
 /* ---------------- Mapeos API ↔ editor ---------------- */
 
+/* Traducción de tipos entre la API y el editor.
+   'multi' se representa en el editor como 'quiz' + multi=true. */
+function apiKindToEditor(kind) {
+  return kind === 'true_false' ? 'tf'
+    : kind === 'poll' ? 'poll'
+    : kind === 'short' ? 'short'
+    : kind === 'puzzle' ? 'puzzle'
+    : kind === 'slide' ? 'slide'
+    : 'quiz'
+}
+function editorKindToApi(q) {
+  if (q.kind === 'tf') return 'true_false'
+  if (q.kind === 'poll') return 'poll'
+  if (q.kind === 'short') return 'short'
+  if (q.kind === 'puzzle') return 'puzzle'
+  if (q.kind === 'slide') return 'slide'
+  return q.multi ? 'multi' : 'quiz'
+}
+
 function apiToEditor(apiQuiz) {
   return {
     id: apiQuiz.id,
@@ -32,22 +51,24 @@ function apiToEditor(apiQuiz) {
     color: PALETA[apiQuiz.id % PALETA.length],
     questions: (apiQuiz.questions ?? []).map((q) => ({
       id: localId++,
-      kind: q.kind === 'true_false' ? 'tf' : 'quiz',
+      kind: apiKindToEditor(q.kind),
       multi: q.kind === 'multi',
       title: q.title,
-      timeLimit: q.time_limit,
-      points: q.points_mode,
+      body: q.body ?? '',        // cuerpo de la diapositiva
+      timeLimit: q.time_limit ?? 20,
+      points: q.points_mode ?? 'standard',
       media: q.image_url ? { type: 'image', url: q.image_url, path: q.image_path } : null,
       text: '',
-      // El editor usa 4 slots fijos para quiz: rellenamos los que falten.
       options: padOptions(q),
     })),
   }
 }
 
 function padOptions(apiQuestion) {
+  if (apiQuestion.kind === 'slide') return [] // la diapositiva no tiene opciones
   const opts = apiQuestion.options.map((o) => ({ text: o.text, correct: o.is_correct }))
   if (apiQuestion.kind !== 'true_false') {
+    // quiz, multi y poll usan 4 slots fijos: rellenamos los que falten.
     while (opts.length < 4) opts.push({ text: '', correct: false })
   }
   return opts
@@ -55,11 +76,17 @@ function padOptions(apiQuestion) {
 
 /** ¿La pregunta pasaría la validación del servidor? */
 export function esPreguntaCompleta(q) {
+  if (q.kind === 'slide') return !!q.title?.trim() && !!q.body?.trim()
   if (!q.title?.trim()) return false
+
   const conTexto = q.options.filter((o) => o.text.trim())
-  const correctas = conTexto.filter((o) => o.correct).length
-  if (q.kind === 'tf') return q.options.length === 2 && correctas === 1
+  if (q.kind === 'tf') return q.options.length === 2 && conTexto.filter((o) => o.correct).length === 1
+  if (q.kind === 'short') return conTexto.length >= 1 // al menos 1 respuesta aceptada
   if (conTexto.length < 2) return false
+  if (q.kind === 'poll') return true // la encuesta no exige respuesta correcta
+  if (q.kind === 'puzzle') return true // el orden es la respuesta (2+ piezas con texto)
+
+  const correctas = conTexto.filter((o) => o.correct).length
   return q.multi ? correctas >= 1 : correctas === 1
 }
 
@@ -68,16 +95,28 @@ function editorToApi(editorQuiz) {
     title: editorQuiz.title?.trim() || 'Sin título',
     questions: editorQuiz.questions
       .filter(esPreguntaCompleta)
-      .map((q) => ({
-        kind: q.kind === 'tf' ? 'true_false' : q.multi ? 'multi' : 'quiz',
-        title: q.title.trim(),
-        time_limit: q.timeLimit,
-        points_mode: q.points ?? 'standard',
-        image_path: q.media?.path ?? null,
-        options: q.options
-          .filter((o) => o.text.trim())
-          .map((o) => ({ text: o.text.trim(), is_correct: o.correct })),
-      })),
+      .map((q) => {
+        // Diapositiva: sin opciones ni tiempo, con cuerpo.
+        if (q.kind === 'slide') {
+          return { kind: 'slide', title: q.title.trim(), body: q.body.trim(), image_path: q.media?.path ?? null }
+        }
+
+        return {
+          kind: editorKindToApi(q),
+          title: q.title.trim(),
+          time_limit: q.timeLimit,
+          points_mode: q.points ?? 'standard',
+          image_path: q.media?.path ?? null,
+          options: q.options
+            .filter((o) => o.text.trim())
+            // Encuesta y puzzle: sin correcta (el orden es la respuesta). Escribe:
+            // todas son aceptadas (is_correct=true). El resto respeta el marcador.
+            .map((o) => ({
+              text: o.text.trim(),
+              is_correct: q.kind === 'poll' || q.kind === 'puzzle' ? false : q.kind === 'short' ? true : o.correct,
+            })),
+        }
+      }),
   }
 }
 
@@ -89,20 +128,27 @@ export function nuevoItemEditor(kind = 'quiz') {
     kind,
     multi: false,
     title: '',
+    body: '',
     timeLimit: 20,
     points: 'standard',
     media: null,
     text: '',
     options: [],
   }
-  base.options = kind === 'tf'
-    ? [{ text: 'Verdadero', correct: true }, { text: 'Falso', correct: false }]
-    : [
-        { text: '', correct: true },
-        { text: '', correct: false },
-        { text: '', correct: false },
-        { text: '', correct: false },
-      ]
+
+  if (kind === 'slide') return base // sin opciones
+  if (kind === 'tf') {
+    base.options = [{ text: 'Verdadero', correct: true }, { text: 'Falso', correct: false }]
+    return base
+  }
+
+  // quiz y poll arrancan con 4 slots (la encuesta sin ninguna marcada).
+  base.options = [
+    { text: '', correct: kind !== 'poll' },
+    { text: '', correct: false },
+    { text: '', correct: false },
+    { text: '', correct: false },
+  ]
   return base
 }
 
