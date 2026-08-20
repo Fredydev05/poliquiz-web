@@ -95,6 +95,12 @@ const totalVotos = computed(() =>
   game.distribution.reduce((acc, d) => acc + d.count, 0) || 1
 )
 const esCorrecta = (id) => game.correctOptionIds.includes(id)
+// La encuesta no tiene correcta: en la revelación no se atenúa ni se resalta nada.
+const esPoll = computed(() => game.question?.kind === 'poll')
+// Escribe la respuesta: no tiene opciones; los alumnos tipean.
+const esShort = computed(() => game.question?.kind === 'short')
+// Rompecabezas: cada alumno ordena; al cerrar se muestra el orden correcto.
+const esPuzzle = computed(() => game.question?.kind === 'puzzle')
 
 async function salir() {
   await game.end()
@@ -208,10 +214,28 @@ function detenerConfeti() {
       </BaseButton>
     </div>
 
-    <!-- ═════════ FASE: GET READY ═════════ -->
-    <div v-else-if="game.state === 'get_ready'" class="flex-1 flex flex-col items-center justify-center gap-6">
-      <p class="text-white/50 text-lg uppercase tracking-widest">Pregunta {{ game.currentIndex + 1 }}</p>
-      <p class="text-6xl font-extrabold anim-preparate">¡Preparate!</p>
+    <!-- ═════════ FASE: GET READY · reveal del enunciado (se lee antes de las opciones) ═════════ -->
+    <div v-else-if="game.state === 'get_ready'" class="flex-1 flex flex-col items-center justify-center gap-6 p-6 text-center">
+      <p class="text-white/50 text-lg uppercase tracking-widest anim-reveal-label">
+        Pregunta {{ game.currentIndex + 1 }} / {{ game.questionsTotal }}
+      </p>
+      <h2 class="text-4xl lg:text-5xl font-extrabold leading-snug max-w-4xl anim-reveal-title">{{ game.revealTitle }}</h2>
+      <img v-if="game.revealImage" :src="game.revealImage" class="max-h-52 rounded-xl shadow-lg object-contain anim-reveal-img" alt="" />
+      <p class="text-white/40 text-sm uppercase tracking-[0.3em] anim-preparate">¡Preparate!</p>
+    </div>
+
+    <!-- ═════════ FASE: DIAPOSITIVA · el docente proyecta y explica ═════════ -->
+    <div v-else-if="game.state === 'slide'" class="flex-1 flex flex-col p-6 gap-6">
+      <div class="flex-1 flex flex-col items-center justify-center gap-6 text-center anim-reveal-title min-h-0 overflow-y-auto">
+        <h2 class="text-4xl lg:text-5xl font-extrabold leading-snug max-w-4xl">{{ game.slide?.title }}</h2>
+        <img v-if="game.slide?.image_url" :src="game.slide.image_url" class="max-h-56 rounded-xl shadow-lg object-contain" alt="" />
+        <p class="text-xl lg:text-2xl text-white/80 leading-relaxed max-w-3xl whitespace-pre-wrap">{{ game.slide?.body }}</p>
+      </div>
+      <div class="flex justify-center shrink-0">
+        <BaseButton variant="success" size="lg" @click="game.next()">
+          <SkipForward :size="18" /> Siguiente
+        </BaseButton>
+      </div>
     </div>
 
     <!-- ═════════ FASES: QUESTION / RESULTS ═════════ -->
@@ -254,15 +278,15 @@ function detenerConfeti() {
       </div>
 
       <!-- Opciones (V/F usa 2 columnas grandes; quiz usa la grilla 2x2) -->
-      <div class="grid gap-4" :class="game.question?.kind === 'true_false' ? 'grid-cols-2' : 'grid-cols-2'">
+      <div v-if="!esShort && !esPuzzle" class="grid gap-4" :class="game.question?.kind === 'true_false' ? 'grid-cols-2' : 'grid-cols-2'">
         <div
           v-for="(op, i) in game.question?.options ?? []"
           :key="op.id"
           class="relative overflow-hidden flex items-center gap-4 rounded-xl font-bold shadow-md transition-all"
           :class="[
             game.question.kind === 'true_false' ? (i === 0 ? 'bg-azul p-7 text-2xl justify-center' : 'bg-coral p-7 text-2xl justify-center') : estilos[i].color + ' p-5 text-xl',
-            game.state === 'results' && !esCorrecta(op.id) ? 'opacity-30' : '',
-            game.state === 'results' && esCorrecta(op.id) ? 'ring-4 ring-white scale-[1.02]' : '',
+            game.state === 'results' && !esPoll && !esCorrecta(op.id) ? 'opacity-30' : '',
+            game.state === 'results' && !esPoll && esCorrecta(op.id) ? 'ring-4 ring-white scale-[1.02]' : '',
           ]"
         >
           <svg viewBox="0 0 100 100" class="w-8 h-8 shrink-0 fill-white">
@@ -290,6 +314,42 @@ function detenerConfeti() {
               :style="{ width: ((game.distribution.find((d) => d.option_id === op.id)?.count ?? 0) / totalVotos) * 100 + '%' }"
             ></div>
           </template>
+        </div>
+      </div>
+
+      <!-- ESCRIBE LA RESPUESTA: sin opciones; los alumnos tipean, y al cerrar se revela -->
+      <div v-if="esShort" class="flex-1 flex flex-col items-center justify-center gap-4 min-h-0">
+        <p v-if="game.state === 'question'" class="text-white/60 text-lg">✍️ Los estudiantes están escribiendo su respuesta…</p>
+        <div v-else class="w-full max-w-2xl space-y-4">
+          <div class="text-center">
+            <p class="text-white/50 text-sm uppercase tracking-widest mb-2">
+              Respuesta{{ (game.reveal?.accepted?.length ?? 0) > 1 ? 's' : '' }} aceptada{{ (game.reveal?.accepted?.length ?? 0) > 1 ? 's' : '' }}
+            </p>
+            <div class="flex flex-wrap justify-center gap-2">
+              <span v-for="(a, i) in game.reveal?.accepted ?? []" :key="i" class="bg-esmeralda text-white font-bold rounded-lg px-4 py-2">{{ a }}</span>
+            </div>
+          </div>
+          <div v-if="(game.reveal?.answers?.length ?? 0)" class="space-y-1.5">
+            <p class="text-white/40 text-xs uppercase tracking-widest text-center">Lo que respondieron</p>
+            <div v-for="(ans, i) in game.reveal.answers" :key="i" class="flex items-center gap-3 bg-white/10 rounded-lg px-4 py-2">
+              <Check v-if="ans.correct" :size="16" class="text-esmeralda shrink-0" />
+              <span v-else class="w-4 shrink-0"></span>
+              <span class="flex-1 truncate" :class="ans.correct ? 'font-bold' : 'text-white/70'">{{ ans.text }}</span>
+              <span class="text-sm bg-white/15 rounded-full px-2.5 py-0.5 tabular-nums shrink-0">{{ ans.count }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ROMPECABEZAS: cada alumno ordena; al cerrar se muestra el orden correcto -->
+      <div v-if="esPuzzle" class="flex-1 flex flex-col items-center justify-center gap-4 min-h-0">
+        <p v-if="game.state === 'question'" class="text-white/60 text-lg">🧩 Los estudiantes están ordenando las piezas…</p>
+        <div v-else class="w-full max-w-lg space-y-2">
+          <p class="text-white/50 text-sm uppercase tracking-widest text-center mb-2">Orden correcto</p>
+          <div v-for="(p, i) in game.reveal?.correct_order ?? []" :key="i" class="flex items-center gap-3 bg-white/10 rounded-lg px-4 py-3">
+            <span class="w-8 h-8 rounded-lg bg-esmeralda text-white font-bold flex items-center justify-center shrink-0">{{ p.position }}</span>
+            <span class="flex-1 font-semibold">{{ p.text }}</span>
+          </div>
         </div>
       </div>
 
@@ -435,8 +495,17 @@ function detenerConfeti() {
 }
 .anim-podio-texto { animation: podio-aparece 250ms ease-out both; }
 
+/* Reveal del enunciado: label baja, título entra con scale, imagen sube */
+@keyframes reveal-label-entra { from { opacity: 0; transform: translateY(-10px); } }
+@keyframes reveal-title-entra { from { opacity: 0; transform: scale(0.94); } }
+@keyframes reveal-img-entra { from { opacity: 0; transform: translateY(10px); } }
+.anim-reveal-label { animation: reveal-label-entra 300ms ease-out both; }
+.anim-reveal-title { animation: reveal-title-entra 400ms cubic-bezier(0.23, 1, 0.32, 1) both; }
+.anim-reveal-img { animation: reveal-img-entra 400ms ease-out 120ms both; }
+
 @media (prefers-reduced-motion: reduce) {
-  .anim-pop, .anim-preparate, .anim-fila { animation: none; }
+  .anim-pop, .anim-preparate, .anim-fila,
+  .anim-reveal-label, .anim-reveal-title, .anim-reveal-img { animation: none; }
   .anim-podio-columna { animation: podio-aparece 200ms ease both; }
   .anim-qr-backdrop, .anim-qr-modal { animation: none; }
 }

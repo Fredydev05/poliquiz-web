@@ -24,6 +24,12 @@ export const usePlayerStore = defineStore('player', {
     joining: false,
     error: null,
 
+    // --- reveal (el enunciado se lee antes de que aparezcan las opciones) ---
+    revealTitle: '',
+
+    // --- diapositiva en pantalla (pantalla pasiva) ---
+    slide: null,           // {title}
+
     // --- pregunta en curso ---
     currentIndex: -1,
     questionsTotal: 0,
@@ -112,9 +118,16 @@ export const usePlayerStore = defineStore('player', {
           this.gameState = 'get_ready'
           this.currentIndex = e.index
           this.questionsTotal = e.total
+          this.revealTitle = e.title       // el jugador lee el enunciado en el reveal
           this.answered = false
           this.mySelection = []
           this.lastResult = null
+        })
+        .listen('.SlideShown', (e) => {
+          this.gameState = 'slide'
+          this.currentIndex = e.index
+          this.questionsTotal = e.total
+          this.slide = { title: e.title }
         })
         .listen('.QuestionStarted', (e) => {
           this.gameState = 'question'
@@ -147,15 +160,30 @@ export const usePlayerStore = defineStore('player', {
     },
 
     /** Envía la respuesta (ids de opciones). El servidor valida TODO. */
+    /** Respuesta por opciones (quiz/tf/multi/encuesta). */
     async answer(selectedIds) {
+      await this._send({ selected: selectedIds }, selectedIds)
+    },
+
+    /** Respuesta escrita (tipo "escribe la respuesta"). */
+    async answerText(text) {
+      await this._send({ text }, [text])
+    },
+
+    /** Respuesta de orden (rompecabezas): array de ids en el orden elegido. */
+    async answerOrder(order) {
+      await this._send({ order }, order)
+    },
+
+    async _send(payload, selection) {
       if (this.answered || this.gameState !== 'question') return
       this.answered = true          // feedback inmediato (optimista)
-      this.mySelection = selectedIds
+      this.mySelection = selection
       try {
         await gamesApi.answer(this.pin, {
           question_index: this.currentIndex,
           question_uuid: this.questionUuid,
-          selected: selectedIds,
+          ...payload,
         })
       } catch (e) {
         // TIME_EXPIRED o STALE: la revelación llegará igual por WS.
