@@ -79,6 +79,18 @@ function cerrarModalConEscape(e) {
   if (e.key === 'Escape') showQrModal.value = false
 }
 
+// La pregunta la cierra el servidor (timeout o "todos respondieron"). Si 4 s
+// después de llegar a 0 sigue abierta (la cola no corrió), el docente puede
+// cerrarla a mano; el servidor igual rechaza cerrarla antes de tiempo.
+const preguntaTrabada = ref(false)
+let trabaTimer = null
+watch(() => game.state === 'question' && timer.seconds.value === 0, (vencida) => {
+  clearTimeout(trabaTimer)
+  preguntaTrabada.value = false
+  if (vencida) trabaTimer = setTimeout(() => { preguntaTrabada.value = true }, 4000)
+})
+onUnmounted(() => clearTimeout(trabaTimer))
+
 // El temporizador arranca/re-arranca cuando el servidor lanza la pregunta.
 watch(() => game.state, (estado) => {
   if (estado === 'question') {
@@ -136,7 +148,7 @@ function detenerConfeti() {
 </script>
 
 <template>
-  <div class="min-h-[calc(100vh-52px)] bg-marino text-white flex flex-col">
+  <div class="min-h-screen bg-marino text-white flex flex-col">
 
     <!-- ═════════ Barra superior de la proyección ═════════ -->
     <header class="flex items-center justify-between px-6 py-3 border-b border-white/10">
@@ -355,8 +367,9 @@ function detenerConfeti() {
 
       <!-- Controles del docente -->
       <div class="flex justify-center gap-3">
-        <BaseButton v-if="game.state === 'question'" variant="danger" @click="game.next()" :disabled="true" title="La pregunta cierra sola (timeout o todos respondieron)">
-          <Square :size="16" /> Esperando respuestas…
+        <BaseButton v-if="game.state === 'question'" variant="danger" @click="game.next()" :disabled="!preguntaTrabada"
+                    :title="preguntaTrabada ? 'El tiempo terminó: cerrá la pregunta' : 'La pregunta cierra sola (timeout o todos respondieron)'">
+          <Square :size="16" /> {{ preguntaTrabada ? 'Cerrar pregunta' : 'Esperando respuestas…' }}
         </BaseButton>
         <BaseButton v-else variant="success" @click="game.next()">
           <SkipForward :size="18" />
