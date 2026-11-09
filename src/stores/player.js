@@ -39,6 +39,8 @@ export const usePlayerStore = defineStore('player', {
     serverNowMs: 0,
     answered: false,
     mySelection: [],
+    late: false,           // la respuesta llegó cuando la pregunta ya había cerrado
+    sendError: null,       // no se pudo enviar (red): puede volver a intentar
 
     // --- feedback personal (viene de /me tras QuestionEnded) ---
     lastResult: null,      // {is_correct, points, streak}
@@ -120,6 +122,8 @@ export const usePlayerStore = defineStore('player', {
           this.questionsTotal = e.total
           this.revealTitle = e.title       // el jugador lee el enunciado en el reveal
           this.answered = false
+          this.late = false
+          this.sendError = null
           this.mySelection = []
           this.lastResult = null
         })
@@ -141,6 +145,8 @@ export const usePlayerStore = defineStore('player', {
           this.endsAtMs = e.ends_at_ms
           this.serverNowMs = e.server_now_ms
           this.answered = false
+          this.late = false
+          this.sendError = null
         })
         .listen('.QuestionEnded', async () => {
           this.gameState = 'results'
@@ -180,10 +186,16 @@ export const usePlayerStore = defineStore('player', {
       await this._send({ order }, order)
     },
 
+    /** Lluvia de ideas: hasta 3 textos en un solo envío. */
+    async answerIdeas(ideas) {
+      await this._send({ ideas }, ideas)
+    },
+
     async _send(payload, selection) {
       if (this.answered || this.gameState !== 'question') return
       this.answered = true          // feedback inmediato (optimista)
       this.mySelection = selection
+      this.sendError = null
       try {
         await gamesApi.answer(this.pin, {
           question_index: this.currentIndex,
@@ -191,8 +203,17 @@ export const usePlayerStore = defineStore('player', {
           ...payload,
         })
       } catch (e) {
-        // TIME_EXPIRED o STALE: la revelación llegará igual por WS.
-        if (e.response?.status === 401) this.leaveKicked()
+        const status = e.response?.status
+        const code = e.response?.data?.code
+        if (status === 401) return this.leaveKicked()
+        if (code === 'ALREADY_ANSWERED') return // ya estaba registrada: todo bien
+        if (['TIME_EXPIRED', 'STALE_QUESTION', 'WRONG_STATE'].includes(code)) {
+          this.late = true // llegó tarde: se lo decimos en vez de "enviada"
+          return
+        }
+        // Sin respuesta del servidor (red) o rechazo de forma: puede reintentar.
+        this.answered = false
+        this.sendError = e.response?.data?.message ?? 'No se pudo enviar tu respuesta. Probá de nuevo.'
       }
     },
 

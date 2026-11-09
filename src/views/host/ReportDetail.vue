@@ -141,14 +141,15 @@ const tabs = [
             <p class="font-bold text-marino">
               <span class="text-slate-400 mr-1">{{ q.index + 1 }}.</span>{{ q.title }}
             </p>
-            <span class="text-sm font-bold tabular-nums shrink-0"
+            <span v-if="q.scored !== false" class="text-sm font-bold tabular-nums shrink-0"
                   :class="q.accuracy >= 50 ? 'text-esmeralda' : 'text-coral'">
               {{ q.accuracy }}% ✓
             </span>
+            <span v-else class="text-xs font-semibold text-slate-400 uppercase tracking-wide shrink-0">Sin puntaje</span>
           </div>
 
-          <!-- Distribución por opción -->
-          <div class="space-y-1.5">
+          <!-- Distribución por opción (solo tipos de opciones: en escribe/puzzle no hay "elección") -->
+          <div v-if="q.options.some((o) => o.count !== null)" class="space-y-1.5">
             <div v-for="(o, i) in q.options" :key="o.id" class="flex items-center gap-2">
               <span class="w-3.5 h-3.5 rounded shrink-0" :class="coloresOpcion[i]"></span>
               <span class="text-sm flex-1 truncate" :class="o.is_correct ? 'font-semibold text-marino' : 'text-slate-500'">
@@ -161,6 +162,14 @@ const tabs = [
               <span class="text-xs text-slate-400 tabular-nums w-6 text-right">{{ o.count }}</span>
             </div>
           </div>
+          <!-- Lo que escribieron (escribe, nube, abierta, lluvia de ideas) -->
+          <div v-if="q.texts?.length" class="flex flex-wrap gap-1.5 mt-1">
+            <span v-for="(t, i) in q.texts" :key="i" class="text-sm bg-slate-100 text-marino rounded-lg px-2.5 py-1">
+              {{ t.text }}<span v-if="t.count > 1" class="text-slate-400 font-semibold"> ×{{ t.count }}</span>
+            </span>
+          </div>
+          <p v-else-if="q.texts" class="text-sm text-slate-400">Nadie respondió.</p>
+
           <p class="text-xs text-slate-400 mt-3">
             {{ q.answered }} respondieron · tiempo medio {{ seg(q.avg_response_ms) }}
           </p>
