@@ -12,7 +12,7 @@ const player = usePlayerStore()
 </script>
 
 <template>
-  <div class="min-h-[calc(100vh-52px)] bg-marino flex items-center justify-center p-4 text-white">
+  <div class="min-h-screen bg-marino flex items-center justify-center p-4 text-white">
     <div class="text-center space-y-6 max-w-sm">
 
       <Loader :size="48" class="mx-auto animate-spin text-dorado" />

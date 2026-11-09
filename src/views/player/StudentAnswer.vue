@@ -90,7 +90,7 @@ function enviarOrden() {
 </script>
 
 <template>
-  <div class="min-h-[calc(100vh-52px)] bg-slate-100 flex flex-col max-w-md mx-auto">
+  <div class="min-h-screen bg-slate-100 flex flex-col max-w-md mx-auto">
 
     <!-- Header: apodo + tiempo + puntaje -->
     <header class="bg-marino text-white px-4 py-3 flex items-center justify-between">
