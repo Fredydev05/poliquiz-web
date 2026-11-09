@@ -8,7 +8,7 @@
 */
 import { computed } from 'vue'
 import {
-  PartyPopper, Frown, AlarmClockOff, Trophy, LogOut, Hourglass, Zap, XCircle,
+  PartyPopper, Frown, AlarmClockOff, Trophy, LogOut, Hourglass, Zap, XCircle, Vote, Puzzle,
 } from 'lucide-vue-next'
 import BaseButton from '../../components/ui/BaseButton.vue'
 import { usePlayerStore } from '../../stores/player'
@@ -17,14 +17,22 @@ const player = usePlayerStore()
 
 const finished = computed(() => player.gameState === 'podium')
 const r = computed(() => player.lastResult)
-// Sin respuesta registrada: no llegó a contestar.
-const sinRespuesta = computed(() => r.value === null || player.mySelection.length === 0 && !r.value)
+// Encuesta: no hay correcta, solo se agradece el voto.
+const esEncuesta = computed(() => r.value?.scored === false)
+// Rompecabezas con algunas piezas bien: suma puntos aunque no sea perfecto.
+const esParcial = computed(() => !!r.value && !r.value.is_correct && r.value.ratio > 0)
+const fondo = computed(() =>
+  finished.value || esEncuesta.value ? 'bg-marino'
+    : r.value?.is_correct ? 'bg-esmeralda'
+    : esParcial.value ? 'bg-dorado'
+    : 'bg-coral',
+)
 </script>
 
 <template>
   <div
-    class="min-h-[calc(100vh-52px)] flex items-center justify-center p-4 max-w-md mx-auto text-white transition-colors"
-    :class="finished ? 'bg-marino' : r?.is_correct ? 'bg-esmeralda' : 'bg-coral'"
+    class="min-h-screen flex items-center justify-center p-4 max-w-md mx-auto text-white transition-colors"
+    :class="fondo"
   >
     <div class="text-center space-y-5">
 
@@ -51,17 +59,37 @@ const sinRespuesta = computed(() => r.value === null || player.mySelection.lengt
         </BaseButton>
       </template>
 
+      <!-- ═══════ ENCUESTA: sin correcta, no cambia puntos ni racha ═══════ -->
+      <template v-else-if="esEncuesta">
+        <Vote :size="56" class="mx-auto anim-celebracion" />
+        <div class="anim-detalle">
+          <h1 class="text-3xl font-extrabold">{{ r.answered ? '¡Voto registrado!' : 'No votaste' }}</h1>
+          <p class="text-white/70 text-sm mt-2">
+            Total: <strong class="tabular-nums">{{ player.score }} pts</strong>
+            <span v-if="player.rank"> · puesto {{ player.rank }}º</span>
+          </p>
+        </div>
+        <p class="text-sm text-white/60 flex items-center justify-center gap-2">
+          <Hourglass :size="15" class="animate-pulse" />
+          Esperando la siguiente pregunta…
+        </p>
+      </template>
+
       <!-- ═══════ RESULTADO DE LA PREGUNTA ═══════ -->
       <template v-else>
         <PartyPopper v-if="r?.is_correct" :size="56" class="mx-auto anim-celebracion" />
-        <Frown v-else-if="r" :size="56" class="mx-auto anim-celebracion" />
+        <Puzzle v-else-if="esParcial" :size="56" class="mx-auto anim-celebracion" />
+        <Frown v-else-if="r?.answered !== false && r" :size="56" class="mx-auto anim-celebracion" />
         <AlarmClockOff v-else :size="56" class="mx-auto anim-celebracion" />
 
         <div class="anim-detalle">
           <h1 class="text-3xl font-extrabold">
-            {{ r?.is_correct ? '¡Correcto!' : r ? 'Incorrecto' : '¡Tiempo agotado!' }}
+            {{ r?.is_correct ? '¡Correcto!' : esParcial ? '¡Casi!' : r && r.answered !== false ? 'Incorrecto' : '¡Tiempo agotado!' }}
           </h1>
-          <p v-if="r?.is_correct && r.points" class="text-white/90 text-xl font-bold mt-2">
+          <p v-if="esParcial" class="text-white/90 text-sm mt-1">
+            {{ Math.round(r.ratio * 100) }}% de las piezas en su lugar
+          </p>
+          <p v-if="(r?.is_correct || esParcial) && r.points" class="text-white/90 text-xl font-bold mt-2">
             +{{ r.points }} puntos
           </p>
           <!-- Racha estilo Kahoot -->
