@@ -133,6 +133,11 @@ export const usePlayerStore = defineStore('player', {
           this.gameState = 'question'
           this.question = e
           this.questionUuid = e.question_uuid
+          // El índice viene también acá: si el celular se (re)conectó durante el
+          // reveal y se perdió GetReadyShown, sin esto respondería con un índice
+          // viejo y el servidor rechazaría la respuesta (STALE_QUESTION).
+          this.currentIndex = e.index
+          this.questionsTotal = e.total
           this.endsAtMs = e.ends_at_ms
           this.serverNowMs = e.server_now_ms
           this.answered = false
