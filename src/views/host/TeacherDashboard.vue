@@ -11,6 +11,7 @@ import { Play, Pencil, Plus, FileQuestion, Copy, Trash2, Loader, Radio, X } from
 import TeacherLayout from './TeacherLayout.vue'
 import BaseCard from '../../components/ui/BaseCard.vue'
 import BaseButton from '../../components/ui/BaseButton.vue'
+import ConfirmModal from '../../components/ui/ConfirmModal.vue'
 import { useQuizApiStore } from '../../stores/quiz'
 import { useGameStore } from '../../stores/game'
 import { STORAGE_KEYS } from '../../api/http'
@@ -19,7 +20,6 @@ const router = useRouter()
 const quizStore = useQuizApiStore()
 const gameStore = useGameStore()
 
-const creando = ref(false)
 const PALETA = ['bg-coral', 'bg-azul', 'bg-dorado', 'bg-esmeralda']
 
 // Partida en curso que el host dejó a medias (sessionStorage, ver stores/game).
@@ -35,14 +35,10 @@ function descartar() {
   partidaEnCurso.value = null
 }
 
-async function crear() {
-  creando.value = true
-  try {
-    const id = await quizStore.createQuiz()
-    router.push(`/editor/${id}`)
-  } finally {
-    creando.value = false
-  }
+/** Abre el editor con un BORRADOR: recién se guarda en la DB cuando el
+    docente llena el primer campo (un click accidental no crea nada). */
+function crear() {
+  router.push('/editor/nuevo')
 }
 
 function editar(id) {
@@ -59,9 +55,18 @@ async function duplicar(quiz) {
   await quizStore.duplicateQuiz(quiz.id)
 }
 
-async function eliminar(quiz) {
-  if (!confirm(`¿Eliminar "${quiz.title}"? Podés recuperarlo pidiéndoselo al administrador.`)) return
-  await quizStore.deleteQuiz(quiz.id)
+/* Eliminar con modal de confirmación (en vez del confirm() del navegador). */
+const aEliminar = ref(null)   // quiz pendiente de confirmar
+const eliminando = ref(false)
+
+async function confirmarEliminar() {
+  eliminando.value = true
+  try {
+    await quizStore.deleteQuiz(aEliminar.value.id)
+    aEliminar.value = null
+  } finally {
+    eliminando.value = false
+  }
 }
 </script>
 
@@ -88,9 +93,8 @@ async function eliminar(quiz) {
         <h1 class="text-2xl font-extrabold text-marino">Mis Cuestionarios</h1>
         <p class="text-sm text-slate-500">Gestioná tus juegos y lanzalos en clase.</p>
       </div>
-      <BaseButton variant="primary" :disabled="creando" @click="crear()">
-        <Loader v-if="creando" :size="18" class="animate-spin" />
-        <Plus v-else :size="18" />
+      <BaseButton variant="primary" @click="crear()">
+        <Plus :size="18" />
         Nuevo cuestionario
       </BaseButton>
     </div>
@@ -136,12 +140,22 @@ async function eliminar(quiz) {
             <button @click="duplicar(quiz)" title="Duplicar" class="text-slate-400 hover:text-marino p-1.5 transition-colors">
               <Copy :size="16" />
             </button>
-            <button @click="eliminar(quiz)" title="Eliminar" class="text-slate-400 hover:text-coral p-1.5 transition-colors">
+            <button @click="aEliminar = quiz" title="Eliminar" class="text-slate-400 hover:text-coral p-1.5 transition-colors">
               <Trash2 :size="16" />
             </button>
           </div>
         </div>
       </BaseCard>
     </div>
+
+    <ConfirmModal
+      :open="!!aEliminar"
+      title="¿Eliminar cuestionario?"
+      :message="`Se eliminará «${aEliminar?.title ?? ''}». Podés recuperarlo pidiéndoselo al administrador.`"
+      confirm-label="Eliminar"
+      :loading="eliminando"
+      @confirm="confirmarEliminar"
+      @cancel="aEliminar = null"
+    />
   </TeacherLayout>
 </template>

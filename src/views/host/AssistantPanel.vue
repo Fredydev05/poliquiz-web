@@ -14,7 +14,7 @@ import { useQuizApiStore } from '../../stores/quiz'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
-  quizId: { type: [Number, String], required: true },
+  quizId: { type: [Number, String], default: null }, // null = borrador aún no guardado
 })
 const emit = defineEmits(['close'])
 
@@ -41,8 +41,21 @@ async function send(texto) {
   streaming.value = true
   scrollToBottom()
 
+  // El asistente trabaja sobre un quiz del servidor: si es un borrador sin
+  // guardar, se crea ahora (hablarle a la IA es una acción deliberada).
+  let quizId = props.quizId
+  if (quizId == null) {
+    try {
+      quizId = await store.ensureCreated()
+    } catch {
+      messages.value[idx].error = 'No se pudo guardar el cuestionario. Probá de nuevo.'
+      streaming.value = false
+      return
+    }
+  }
+
   controller = new AbortController()
-  await streamAssistant(props.quizId, msg, {
+  await streamAssistant(quizId, msg, {
     signal: controller.signal,
     onToken: (t) => { messages.value[idx].text += t; scrollToBottom() },
     onResult: (r) => { messages.value[idx].result = r; scrollToBottom() },
