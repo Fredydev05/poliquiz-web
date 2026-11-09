@@ -16,9 +16,10 @@ import {
   ArrowLeft, Plus, Check, Clock, Trash2, Copy, GripVertical, X, Eye,
   Image as ImageIcon, LayoutGrid, Scale, Type, Puzzle,
   BarChart3, Cloud, MessageSquareText, Lightbulb, Save,
-  CloudUpload, ChevronDown, Sparkles, Award, AlertTriangle, Loader, Presentation, ArrowUp, ArrowDown,
+  CloudUpload, ChevronDown, Sparkles, Award, AlertTriangle, Loader, Presentation, ArrowUp, ArrowDown, Pencil,
 } from 'lucide-vue-next'
 import BaseButton from '../../components/ui/BaseButton.vue'
+import ConfirmModal from '../../components/ui/ConfirmModal.vue'
 import AssistantPanel from './AssistantPanel.vue'
 import { useQuizApiStore, esPreguntaCompleta } from '../../stores/quiz'
 
@@ -55,12 +56,20 @@ const formasOpcion = ['triangulo', 'rombo', 'circulo', 'cuadrado']
 /* ------------------------------- Carga ------------------------------- */
 const cargando = ref(true)
 onMounted(async () => {
-  await quizStore.openQuiz(Number(route.params.id))
+  // /editor/nuevo → borrador local (se crea en la DB al llenar el primer campo).
+  if (route.params.id === 'nuevo') quizStore.startDraft()
+  else await quizStore.openQuiz(Number(route.params.id))
   selectedId.value = quizStore.editing?.questions[0]?.id ?? null
   cargando.value = false
 })
 
 const quiz = computed(() => quizStore.editing)
+
+// Cuando el borrador se crea en el servidor, la URL pasa a tener su id real
+// (así un refresh o "atrás" lo reabren). Mismo componente: no se remonta.
+watch(() => quiz.value?.id, (id) => {
+  if (id != null && route.params.id === 'nuevo') router.replace(`/editor/${id}`)
+})
 
 /* ------------------------------ Selección ------------------------------ */
 const selectedId = ref(null)
@@ -116,12 +125,16 @@ function elegirTipo(kind) {
 function duplicar() {
   if (item.value) selectedId.value = quizStore.duplicateItem(item.value.id)
 }
-function eliminar() {
-  if (!item.value) return
+/* Eliminar pregunta: siempre pasa por el modal de confirmación. */
+const aEliminar = ref(null) // pregunta pendiente de confirmar
+function confirmarEliminar() {
+  const id = aEliminar.value.id
   const lista = quiz.value.questions
-  const idx = lista.findIndex((it) => it.id === item.value.id)
-  quizStore.removeItem(item.value.id)
-  selectedId.value = (lista[idx] ?? lista[idx - 1])?.id ?? null
+  const idx = lista.findIndex((it) => it.id === id)
+  quizStore.removeItem(id)
+  // Si borró la que estaba editando, seleccionamos la vecina.
+  if (selectedId.value === id) selectedId.value = (lista[idx] ?? lista[idx - 1])?.id ?? null
+  aEliminar.value = null
 }
 function setCorrect(i) {
   item.value.options.forEach((op, j) => (op.correct = j === i))
@@ -193,6 +206,9 @@ const showAssistant = ref(false)
         </template>
         <template v-else-if="quizStore.saveState === 'error'">
           <AlertTriangle :size="14" /> Error al guardar — reintenta al próximo cambio
+        </template>
+        <template v-else-if="quiz.id == null">
+          <Pencil :size="14" /> Borrador · se guarda cuando empieces a escribir
         </template>
         <template v-else>
           <Check :size="14" class="text-esmeralda" /> Guardado
@@ -269,7 +285,7 @@ const showAssistant = ref(false)
                 <Copy :size="13" />
               </button>
               <button
-                @click.stop="quizStore.removeItem(it.id); selectedId === it.id && (selectedId = quiz.questions[0]?.id ?? null)"
+                @click.stop="aEliminar = it"
                 title="Eliminar" class="text-slate-400 hover:text-coral p-0.5"
               >
                 <Trash2 :size="13" />
@@ -510,7 +526,7 @@ const showAssistant = ref(false)
         </p>
 
         <div class="flex gap-2 pt-2 border-t border-slate-200">
-          <button @click="eliminar" class="flex-1 text-sm font-semibold text-coral hover:bg-coral/10 rounded-lg py-2 transition-colors flex items-center justify-center gap-1.5">
+          <button @click="aEliminar = item" class="flex-1 text-sm font-semibold text-coral hover:bg-coral/10 rounded-lg py-2 transition-colors flex items-center justify-center gap-1.5">
             <Trash2 :size="15" /> Eliminar
           </button>
           <button @click="duplicar" class="flex-1 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-lg py-2 transition-colors flex items-center justify-center gap-1.5">
@@ -587,6 +603,18 @@ const showAssistant = ref(false)
 
     <!-- ════════════════ PANEL · ASISTENTE IA ════════════════ -->
     <AssistantPanel :open="showAssistant" :quiz-id="quiz.id" @close="showAssistant = false" />
+
+    <!-- ════════════════ MODAL · CONFIRMAR ELIMINAR PREGUNTA ════════════════ -->
+    <ConfirmModal
+      :open="!!aEliminar"
+      title="¿Eliminar pregunta?"
+      :message="aEliminar?.title?.trim()
+        ? `Se eliminará «${aEliminar.title.trim()}» del cuestionario.`
+        : 'Se eliminará esta pregunta del cuestionario.'"
+      confirm-label="Eliminar"
+      @confirm="confirmarEliminar"
+      @cancel="aEliminar = null"
+    />
   </div>
 </template>
 

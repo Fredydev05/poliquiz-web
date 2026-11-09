@@ -9,12 +9,10 @@ import { useRoute, useRouter } from 'vue-router'
 import { LayoutDashboard, FilePlus2, BarChart3, Settings, LogOut } from 'lucide-vue-next'
 import BrandLogo from '../../components/ui/BrandLogo.vue'
 import { useAuthStore } from '../../stores/auth'
-import { useQuizApiStore } from '../../stores/quiz'
 
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
-const quizStore = useQuizApiStore()
 
 // Si recargó la página, recuperamos el usuario a partir del token guardado.
 onMounted(() => {
@@ -23,15 +21,11 @@ onMounted(() => {
 
 const menu = [
   { label: 'Mis cuestionarios', icon: LayoutDashboard, action: () => router.push('/dashboard'), path: '/dashboard' },
-  { label: 'Crear cuestionario', icon: FilePlus2, action: crearYEditar, path: '/editor' },
+  // Abre un borrador: se guarda en la DB recién cuando se llena el primer campo.
+  { label: 'Crear cuestionario', icon: FilePlus2, action: () => router.push('/editor/nuevo'), path: '/editor' },
   { label: 'Reportes', icon: BarChart3, action: () => router.push('/reportes'), path: '/reportes' },
   { label: 'Configuración', icon: Settings, action: null, path: null },
 ]
-
-async function crearYEditar() {
-  const id = await quizStore.createQuiz()
-  router.push(`/editor/${id}`)
-}
 
 async function cerrarSesion() {
   await auth.logout()
@@ -40,7 +34,7 @@ async function cerrarSesion() {
 </script>
 
 <template>
-  <div class="min-h-[calc(100vh-52px)] flex bg-slate-100">
+  <div class="min-h-screen flex bg-slate-100">
     <!-- ============ SIDEBAR (color institucional) ============ -->
     <aside class="w-64 bg-marino text-white flex-col hidden md:flex shrink-0">
       <div class="p-5 border-b border-white/10">

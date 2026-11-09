@@ -120,6 +120,28 @@ function editorToApi(editorQuiz) {
   }
 }
 
+/* ---------------- Borrador: ¿el docente ya escribió algo? ---------------- */
+
+const TITULO_NUEVO = 'Nuevo cuestionario'
+
+/**
+ * ¿El borrador tiene contenido real? Un cambio de título, cualquier texto de
+ * una pregunta/opción, el cuerpo de una diapositiva o una imagen cuentan; los
+ * valores por defecto (título "Nuevo cuestionario", "Verdadero"/"Falso" de V/F,
+ * cambiar el tipo o el tiempo) no.
+ */
+function tieneContenido(editorQuiz) {
+  const titulo = editorQuiz.title?.trim()
+  if (titulo && titulo !== TITULO_NUEVO) return true
+
+  return editorQuiz.questions.some((q) =>
+    q.title?.trim()
+    || q.body?.trim()
+    || q.media
+    || (q.kind !== 'tf' && q.options.some((o) => o.text.trim())),
+  )
+}
+
 /* ---------------- Fábrica de ítems del editor ---------------- */
 
 export function nuevoItemEditor(kind = 'quiz') {
@@ -161,6 +183,7 @@ export const useQuizApiStore = defineStore('quiz', {
     loading: false,
     saveState: 'saved',   // 'saved' | 'saving' | 'error'
     _saveTimer: null,
+    _creating: null,      // promesa de creación del borrador en vuelo
   }),
 
   actions: {
@@ -173,12 +196,31 @@ export const useQuizApiStore = defineStore('quiz', {
       }
     },
 
-    /** Crea un quiz vacío en el servidor y lo abre en el editor. */
-    async createQuiz() {
-      const created = await quizzesApi.create({ title: 'Nuevo cuestionario', questions: [] })
-      this.editing = apiToEditor(created)
-      this.editing.questions.push(nuevoItemEditor('quiz'))
-      return created.id
+    /**
+     * Abre un BORRADOR local (id = null): todavía no existe en la DB. Se crea
+     * recién cuando el docente llena el primer campo (ver saveNow), así un
+     * click accidental en "Nuevo cuestionario" no deja quizzes vacíos.
+     */
+    startDraft() {
+      this.editing = {
+        id: null,
+        title: TITULO_NUEVO,
+        color: PALETA[0],
+        questions: [nuevoItemEditor('quiz')],
+      }
+      this.saveState = 'saved'
+    },
+
+    /** Crea el borrador en el servidor (una sola vez aunque se llame en paralelo). */
+    async ensureCreated() {
+      if (this.editing.id != null) return this.editing.id
+      this._creating ??= quizzesApi.create(editorToApi(this.editing))
+        .then((created) => {
+          this.editing.id = created.id
+          return created.id
+        })
+        .finally(() => { this._creating = null })
+      return this._creating
     },
 
     async openQuiz(id) {
@@ -192,6 +234,7 @@ export const useQuizApiStore = defineStore('quiz', {
     /** Autoguardado con debounce (lo dispara un watcher del editor). */
     scheduleSave() {
       if (!this.editing) return
+      if (this.editing.id == null && !tieneContenido(this.editing)) return // borrador intacto
       this.saveState = 'saving'
       clearTimeout(this._saveTimer)
       this._saveTimer = setTimeout(() => this.saveNow(), 800)
@@ -199,7 +242,25 @@ export const useQuizApiStore = defineStore('quiz', {
 
     async saveNow() {
       if (!this.editing) return
+      clearTimeout(this._saveTimer)
+
+      // Borrador que nadie tocó todavía: no se guarda nada en la DB.
+      if (this.editing.id == null && !tieneContenido(this.editing)) {
+        this.saveState = 'saved'
+        return
+      }
+
       try {
+        if (this.editing.id == null) {
+          // Si ya había una creación en vuelo, su payload puede ser viejo:
+          // la esperamos y después actualizamos con el contenido actual.
+          const enVuelo = !!this._creating
+          await this.ensureCreated()
+          if (!enVuelo) {
+            this.saveState = 'saved'
+            return
+          }
+        }
         await quizzesApi.update(this.editing.id, editorToApi(this.editing))
         this.saveState = 'saved'
       } catch (e) {
@@ -244,9 +305,10 @@ export const useQuizApiStore = defineStore('quiz', {
     insertGeneratedQuestions(apiQuestions) {
       const nuevas = (apiQuestions ?? []).map((q) => ({
         id: localId++,
-        kind: q.kind === 'true_false' ? 'tf' : 'quiz',
+        kind: apiKindToEditor(q.kind),
         multi: q.kind === 'multi',
         title: q.title,
+        body: q.body ?? '',
         timeLimit: q.time_limit,
         points: q.points_mode ?? 'standard',
         media: null,
