@@ -178,7 +178,20 @@ export const useGameStore = defineStore('game', {
 
     /** Avanza la máquina de estados (lobby→juego, results→leaderboard, …). */
     async start() { await gamesApi.start(this.pin) },
-    async next() { await gamesApi.next(this.pin) },
+    /**
+     * "Siguiente". Si el servidor todavía está calculando los resultados de
+     * la pregunta (RESULTS_PENDING, dura milisegundos), reintenta solo.
+     */
+    async next() {
+      for (let intento = 0; ; intento++) {
+        try {
+          return await gamesApi.next(this.pin)
+        } catch (e) {
+          if (e.response?.data?.code !== 'RESULTS_PENDING' || intento >= 8) throw e
+          await new Promise((r) => setTimeout(r, 600))
+        }
+      }
+    },
 
     /** Aborta la partida y desarma la sala (X del host). */
     async end() {
