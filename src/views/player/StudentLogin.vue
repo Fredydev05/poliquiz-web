@@ -55,7 +55,7 @@ async function entrar() {
         <BaseInput
           v-model="nick"
           label="Apodo (Nickname)"
-          placeholder="Ej: ProfeMatias"
+          placeholder="Ej: Alumno 1"
           maxlength="15"
           @keyup.enter="entrar"
         />
