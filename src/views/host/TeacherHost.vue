@@ -170,7 +170,7 @@ watch([() => store.currentQuestionIndex.value, () => store.gameState.value], () 
 </script>
 
 <template>
-  <div class="min-h-[calc(100vh-52px)] bg-marino text-white flex flex-col">
+  <div class="min-h-screen bg-marino text-white flex flex-col">
 
     <!-- Barra superior de la proyección -->
     <header class="flex items-center justify-between px-6 py-4 border-b border-white/10">

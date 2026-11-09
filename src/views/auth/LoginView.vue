@@ -40,7 +40,7 @@ async function enviar() {
 </script>
 
 <template>
-  <div class="min-h-[calc(100vh-52px)] bg-marino flex items-center justify-center p-4">
+  <div class="min-h-screen bg-marino flex items-center justify-center p-4">
     <div class="w-full max-w-sm bg-white rounded-2xl shadow-2xl p-6 space-y-5">
       <div class="flex justify-center">
         <BrandLogo size="lg" />

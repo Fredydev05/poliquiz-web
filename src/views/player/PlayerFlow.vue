@@ -43,7 +43,7 @@ const vista = computed(() => {
     <!-- Reveal (~5 s): el jugador LEE el enunciado antes de que aparezcan las opciones -->
     <div
       v-if="vista.screen === 'reveal'"
-      class="min-h-[calc(100vh-52px)] bg-marino flex flex-col items-center justify-center gap-5 text-white max-w-md mx-auto px-6 text-center"
+      class="min-h-screen bg-marino flex flex-col items-center justify-center gap-5 text-white max-w-md mx-auto px-6 text-center"
     >
       <p class="text-white/50 uppercase tracking-widest text-sm">
         Pregunta {{ player.currentIndex + 1 }}<template v-if="player.questionsTotal"> / {{ player.questionsTotal }}</template>
@@ -55,7 +55,7 @@ const vista = computed(() => {
     <!-- Diapositiva: pantalla pasiva (el contenido está en la proyección del aula) -->
     <div
       v-else-if="vista.screen === 'slide'"
-      class="min-h-[calc(100vh-52px)] bg-marino flex flex-col items-center justify-center gap-4 text-white max-w-md mx-auto px-6 text-center"
+      class="min-h-screen bg-marino flex flex-col items-center justify-center gap-4 text-white max-w-md mx-auto px-6 text-center"
     >
       <Presentation :size="44" class="text-white/40" />
       <p class="text-xl font-bold">{{ player.slide?.title }}</p>
