@@ -27,20 +27,23 @@ const PALETA = ['bg-coral', 'bg-azul', 'bg-dorado', 'bg-esmeralda']
 
 /* Traducción de tipos entre la API y el editor.
    'multi' se representa en el editor como 'quiz' + multi=true. */
+/** Respuesta libre (nube, abierta, lluvia de ideas): sin opciones ni puntos. */
+export const TIPOS_LIBRES = ['wordcloud', 'open', 'brainstorm']
+/** Tipos que no cargan opciones en el editor. */
+export const SIN_OPCIONES = ['slide', ...TIPOS_LIBRES]
+/** Tipos que no suman puntos (el editor oculta el selector de puntaje). */
+export const SIN_PUNTOS = ['poll', ...SIN_OPCIONES]
+
+/* El resto de los tipos se llaman igual en la API y en el editor. */
+const MISMO_NOMBRE = ['poll', 'short', 'puzzle', ...SIN_OPCIONES]
+
 function apiKindToEditor(kind) {
-  return kind === 'true_false' ? 'tf'
-    : kind === 'poll' ? 'poll'
-    : kind === 'short' ? 'short'
-    : kind === 'puzzle' ? 'puzzle'
-    : kind === 'slide' ? 'slide'
-    : 'quiz'
+  if (kind === 'true_false') return 'tf'
+  return MISMO_NOMBRE.includes(kind) ? kind : 'quiz' // quiz y multi
 }
 function editorKindToApi(q) {
   if (q.kind === 'tf') return 'true_false'
-  if (q.kind === 'poll') return 'poll'
-  if (q.kind === 'short') return 'short'
-  if (q.kind === 'puzzle') return 'puzzle'
-  if (q.kind === 'slide') return 'slide'
+  if (MISMO_NOMBRE.includes(q.kind)) return q.kind
   return q.multi ? 'multi' : 'quiz'
 }
 
@@ -65,7 +68,7 @@ function apiToEditor(apiQuiz) {
 }
 
 function padOptions(apiQuestion) {
-  if (apiQuestion.kind === 'slide') return [] // la diapositiva no tiene opciones
+  if (SIN_OPCIONES.includes(apiQuestion.kind)) return [] // diapositiva y respuesta libre
   const opts = apiQuestion.options.map((o) => ({ text: o.text, correct: o.is_correct }))
   if (apiQuestion.kind !== 'true_false') {
     // quiz, multi y poll usan 4 slots fijos: rellenamos los que falten.
@@ -78,6 +81,7 @@ function padOptions(apiQuestion) {
 export function esPreguntaCompleta(q) {
   if (q.kind === 'slide') return !!q.title?.trim() && !!q.body?.trim()
   if (!q.title?.trim()) return false
+  if (TIPOS_LIBRES.includes(q.kind)) return true // solo necesitan la consigna
 
   const conTexto = q.options.filter((o) => o.text.trim())
   if (q.kind === 'tf') return q.options.length === 2 && conTexto.filter((o) => o.correct).length === 1
@@ -158,7 +162,7 @@ export function nuevoItemEditor(kind = 'quiz') {
     options: [],
   }
 
-  if (kind === 'slide') return base // sin opciones
+  if (SIN_OPCIONES.includes(kind)) return base // diapositiva y respuesta libre: sin opciones
   if (kind === 'tf') {
     base.options = [{ text: 'Verdadero', correct: true }, { text: 'Falso', correct: false }]
     return base

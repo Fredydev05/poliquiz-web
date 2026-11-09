@@ -8,7 +8,7 @@
 */
 import { computed } from 'vue'
 import {
-  PartyPopper, Frown, AlarmClockOff, Trophy, LogOut, Hourglass, Zap, XCircle, Vote, Puzzle,
+  PartyPopper, Frown, AlarmClockOff, Trophy, LogOut, Hourglass, Zap, XCircle, Vote, Puzzle, MessageSquareText,
 } from 'lucide-vue-next'
 import BaseButton from '../../components/ui/BaseButton.vue'
 import { usePlayerStore } from '../../stores/player'
@@ -18,7 +18,14 @@ const player = usePlayerStore()
 const finished = computed(() => player.gameState === 'podium')
 const r = computed(() => player.lastResult)
 // Encuesta: no hay correcta, solo se agradece el voto.
+// Sin puntaje (encuesta, nube, abierta, ideas): no hay correcta, solo se agradece.
 const esEncuesta = computed(() => r.value?.scored === false)
+const esVoto = computed(() => player.question?.kind === 'poll')
+const tituloSinPuntos = computed(() =>
+  esVoto.value
+    ? (r.value?.answered ? '¡Voto registrado!' : 'No votaste')
+    : (r.value?.answered ? '¡Respuesta enviada!' : 'No respondiste'),
+)
 // Rompecabezas con algunas piezas bien: suma puntos aunque no sea perfecto.
 const esParcial = computed(() => !!r.value && !r.value.is_correct && r.value.ratio > 0)
 const fondo = computed(() =>
@@ -59,11 +66,11 @@ const fondo = computed(() =>
         </BaseButton>
       </template>
 
-      <!-- ═══════ ENCUESTA: sin correcta, no cambia puntos ni racha ═══════ -->
+      <!-- ═══ SIN PUNTAJE (encuesta y respuesta libre): no cambia puntos ni racha ═══ -->
       <template v-else-if="esEncuesta">
-        <Vote :size="56" class="mx-auto anim-celebracion" />
+        <component :is="esVoto ? Vote : MessageSquareText" :size="56" class="mx-auto anim-celebracion" />
         <div class="anim-detalle">
-          <h1 class="text-3xl font-extrabold">{{ r.answered ? '¡Voto registrado!' : 'No votaste' }}</h1>
+          <h1 class="text-3xl font-extrabold">{{ tituloSinPuntos }}</h1>
           <p class="text-white/70 text-sm mt-2">
             Total: <strong class="tabular-nums">{{ player.score }} pts</strong>
             <span v-if="player.rank"> · puesto {{ player.rank }}º</span>

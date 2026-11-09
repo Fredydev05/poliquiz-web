@@ -113,6 +113,44 @@ const esPoll = computed(() => game.question?.kind === 'poll')
 const esShort = computed(() => game.question?.kind === 'short')
 // Rompecabezas: cada alumno ordena; al cerrar se muestra el orden correcto.
 const esPuzzle = computed(() => game.question?.kind === 'puzzle')
+// Respuesta libre: nube de palabras, muro (abierta) o tablero de ideas.
+const esNube = computed(() => game.question?.kind === 'wordcloud')
+const esAbierta = computed(() => game.question?.kind === 'open')
+const esIdeas = computed(() => game.question?.kind === 'brainstorm')
+const esLibre = computed(() => esNube.value || esAbierta.value || esIdeas.value)
+// Solo estos tipos muestran la grilla de opciones de colores.
+const usaOpciones = computed(() => !esShort.value && !esPuzzle.value && !esLibre.value)
+const MENSAJE_LIBRE = {
+  wordcloud: '☁️ Los estudiantes están escribiendo su palabra…',
+  open: '💬 Los estudiantes están escribiendo su respuesta…',
+  brainstorm: '💡 Los estudiantes están aportando ideas…',
+}
+
+/* Nube de palabras: tamaño y color según cuántas veces se repitió. */
+const COLORES_NUBE = ['text-dorado', 'text-white', 'text-esmeralda', 'text-sky-300', 'text-coral']
+const palabrasNube = computed(() => {
+  const palabras = game.reveal?.words ?? []
+  const max = Math.max(1, ...palabras.map((w) => w.count))
+  // Intercalamos grandes y chicas para que la nube no quede "ordenada".
+  const mezcla = palabras.map((w, i) => ({ ...w, orden: i % 2 ? -i : i }))
+    .sort((a, b) => a.orden - b.orden)
+  return mezcla.map((w, i) => ({
+    ...w,
+    tamano: `${1 + (w.count / max) * 2.8}rem`, // de 1rem a 3.8rem
+    color: COLORES_NUBE[i % COLORES_NUBE.length],
+  }))
+})
+
+/* El reveal (get_ready) lo cierra el StartQuestionJob. Si sigue abierto bastante
+   después de lo previsto (la cola no corrió), el docente puede arrancar la pregunta. */
+const revealTrabado = ref(false)
+let revealTimer = null
+watch(() => game.state === 'get_ready', (enReveal) => {
+  clearTimeout(revealTimer)
+  revealTrabado.value = false
+  if (enReveal) revealTimer = setTimeout(() => { revealTrabado.value = true }, 9000) // 5 s de reveal + margen
+}, { immediate: true })
+onUnmounted(() => clearTimeout(revealTimer))
 
 async function salir() {
   await game.end()
@@ -234,6 +272,9 @@ function detenerConfeti() {
       <h2 class="text-4xl lg:text-5xl font-extrabold leading-snug max-w-4xl anim-reveal-title">{{ game.revealTitle }}</h2>
       <img v-if="game.revealImage" :src="game.revealImage" class="max-h-52 rounded-xl shadow-lg object-contain anim-reveal-img" alt="" />
       <p class="text-white/40 text-sm uppercase tracking-[0.3em] anim-preparate">¡Preparate!</p>
+      <BaseButton v-if="revealTrabado" variant="success" @click="game.next()" title="La pregunta no arrancó sola: arrancala a mano">
+        <SkipForward :size="18" /> Iniciar pregunta
+      </BaseButton>
     </div>
 
     <!-- ═════════ FASE: DIAPOSITIVA · el docente proyecta y explica ═════════ -->
@@ -290,7 +331,7 @@ function detenerConfeti() {
       </div>
 
       <!-- Opciones (V/F usa 2 columnas grandes; quiz usa la grilla 2x2) -->
-      <div v-if="!esShort && !esPuzzle" class="grid gap-4" :class="game.question?.kind === 'true_false' ? 'grid-cols-2' : 'grid-cols-2'">
+      <div v-if="usaOpciones" class="grid gap-4" :class="game.question?.kind === 'true_false' ? 'grid-cols-2' : 'grid-cols-2'">
         <div
           v-for="(op, i) in game.question?.options ?? []"
           :key="op.id"
@@ -363,6 +404,51 @@ function detenerConfeti() {
             <span class="flex-1 font-semibold">{{ p.text }}</span>
           </div>
         </div>
+      </div>
+
+      <!-- RESPUESTA LIBRE: nube, muro o tablero de ideas -->
+      <div v-if="esLibre" class="flex-1 flex flex-col gap-4 min-h-0">
+        <p v-if="game.state === 'question'" class="flex-1 flex items-center justify-center text-white/60 text-lg">
+          {{ MENSAJE_LIBRE[game.question.kind] }}
+        </p>
+
+        <template v-else-if="game.reveal">
+          <p v-if="!game.reveal.total" class="flex-1 flex items-center justify-center text-white/50 text-lg">Nadie respondió esta vez.</p>
+
+          <!-- Nube: más repetida = más grande -->
+          <div v-else-if="esNube" class="flex-1 flex flex-wrap items-center justify-center content-center gap-x-6 gap-y-3 px-6 overflow-y-auto">
+            <span v-for="(w, i) in palabrasNube" :key="w.text"
+                  class="font-extrabold leading-none anim-palabra" :class="w.color"
+                  :style="{ fontSize: w.tamano, animationDelay: `${i * 40}ms` }"
+                  :title="`${w.count} ${w.count === 1 ? 'vez' : 'veces'}`">
+              {{ w.text }}
+            </span>
+          </div>
+
+          <!-- Muro de respuestas abiertas -->
+          <div v-else-if="esAbierta" class="flex-1 overflow-y-auto columns-1 md:columns-2 lg:columns-3 gap-3">
+            <p v-for="(a, i) in game.reveal.answers" :key="i"
+               class="break-inside-avoid mb-3 bg-white/10 rounded-xl px-4 py-3 text-lg leading-snug anim-palabra"
+               :style="{ animationDelay: `${i * 30}ms` }">
+              {{ a.text }}
+            </p>
+          </div>
+
+          <!-- Tablero de ideas: agrupadas, la más propuesta primero -->
+          <div v-else class="flex-1 overflow-y-auto grid sm:grid-cols-2 lg:grid-cols-3 gap-3 content-start">
+            <div v-for="(idea, i) in game.reveal.ideas" :key="idea.text"
+                 class="bg-dorado/90 text-marino rounded-xl px-4 py-3 shadow-md flex items-start justify-between gap-3 anim-palabra"
+                 :style="{ animationDelay: `${i * 40}ms` }">
+              <span class="font-bold leading-snug">{{ idea.text }}</span>
+              <span v-if="idea.count > 1" class="bg-marino text-white text-xs font-bold rounded-full px-2 py-0.5 shrink-0">×{{ idea.count }}</span>
+            </div>
+          </div>
+
+          <p class="text-center text-white/40 text-sm shrink-0">
+            {{ game.reveal.total }} {{ esIdeas ? 'ideas' : 'respuestas' }}
+            <span v-if="game.reveal.hidden"> · {{ game.reveal.hidden }} oculta{{ game.reveal.hidden > 1 ? 's' : '' }} por lenguaje inapropiado</span>
+          </p>
+        </template>
       </div>
 
       <!-- Controles del docente -->
@@ -515,10 +601,12 @@ function detenerConfeti() {
 .anim-reveal-label { animation: reveal-label-entra 300ms ease-out both; }
 .anim-reveal-title { animation: reveal-title-entra 400ms cubic-bezier(0.23, 1, 0.32, 1) both; }
 .anim-reveal-img { animation: reveal-img-entra 400ms ease-out 120ms both; }
+@keyframes palabra-entra { from { opacity: 0; transform: scale(0.6); } }
+.anim-palabra { animation: palabra-entra 350ms cubic-bezier(0.23, 1, 0.32, 1) both; }
 
 @media (prefers-reduced-motion: reduce) {
   .anim-pop, .anim-preparate, .anim-fila,
-  .anim-reveal-label, .anim-reveal-title, .anim-reveal-img { animation: none; }
+  .anim-reveal-label, .anim-reveal-title, .anim-reveal-img, .anim-palabra { animation: none; }
   .anim-podio-columna { animation: podio-aparece 200ms ease both; }
   .anim-qr-backdrop, .anim-qr-modal { animation: none; }
 }

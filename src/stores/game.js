@@ -84,9 +84,13 @@ export const useGameStore = defineStore('game', {
       this.answeredCount = st.answered_count
       this.top = st.top ?? []
       this.players = st.players.map((p) => ({ ...p, connected: true }))
-      // Si volvió en plena revelación, las correctas salen de la pregunta.
+      // Si volvió en plena revelación: el mismo reveal que manda QuestionEnded
+      // (nube, muro, distribución…), así un refresh del proyector no lo pierde.
       if (st.state === 'results' && st.question) {
-        this.correctOptionIds = st.question.options.filter((o) => o.is_correct).map((o) => o.id)
+        this.reveal = st.reveal ?? null
+        this.correctOptionIds = st.reveal?.correct_option_ids
+          ?? st.question.options.filter((o) => o.is_correct).map((o) => o.id)
+        this.distribution = st.reveal?.distribution ?? []
       }
       // Reconexión durante una diapositiva o el reveal: reconstruir el contenido.
       if (st.state === 'slide' && st.question) {

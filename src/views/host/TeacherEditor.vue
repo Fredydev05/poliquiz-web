@@ -7,8 +7,9 @@
   watcher dispara el AUTOGUARDADO real (PUT /quizzes/{id} con debounce).
   Las preguntas incompletas no viajan al servidor hasta estar terminadas.
 
-  v1 juega con 3 tipos: Quiz (simple/múltiple) y Verdadero-Falso.
-  Los demás tipos del catálogo aparecen deshabilitados como "v2".
+  Tipos (catálogo TIPOS): Quiz (simple/múltiple), Verdadero-Falso, Escribe la
+  respuesta, Rompecabezas, Encuesta, Diapositiva, Nube de palabras, Pregunta
+  abierta y Lluvia de ideas.
 */
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -21,7 +22,7 @@ import {
 import BaseButton from '../../components/ui/BaseButton.vue'
 import ConfirmModal from '../../components/ui/ConfirmModal.vue'
 import AssistantPanel from './AssistantPanel.vue'
-import { useQuizApiStore, esPreguntaCompleta } from '../../stores/quiz'
+import { useQuizApiStore, esPreguntaCompleta, TIPOS_LIBRES, SIN_PUNTOS } from '../../stores/quiz'
 
 const route = useRoute()
 const router = useRouter()
@@ -35,9 +36,27 @@ const TIPOS = {
   puzzle: { label: 'Rompecabezas', icon: Puzzle, v1: true, desc: 'El alumno ordena las piezas; vos definís el orden correcto' },
   poll: { label: 'Encuesta', icon: BarChart3, v1: true, desc: 'Recoge opiniones; sin respuesta correcta ni puntos' },
   slide: { label: 'Diapositiva', icon: Presentation, v1: true, desc: 'Contenido para proyectar entre preguntas; sin interacción' },
-  wordcloud: { label: 'Nube de palabras', icon: Cloud, v1: false, desc: 'Llega en la versión 2' },
-  open: { label: 'Pregunta abierta', icon: MessageSquareText, v1: false, desc: 'Llega en la versión 2' },
-  brainstorm: { label: 'Lluvia de ideas', icon: Lightbulb, v1: false, desc: 'Llega en la versión 2' },
+  wordcloud: { label: 'Nube de palabras', icon: Cloud, v1: true, desc: 'Cada alumno escribe una palabra; las más repetidas se ven más grandes' },
+  open: { label: 'Pregunta abierta', icon: MessageSquareText, v1: true, desc: 'Respuesta libre de hasta 250 caracteres; se proyecta como un muro' },
+  brainstorm: { label: 'Lluvia de ideas', icon: Lightbulb, v1: true, desc: 'Cada alumno aporta hasta 3 ideas; se agrupan las parecidas' },
+}
+/* Respuesta libre: qué ve el docente en el editor y en la vista previa. */
+const AYUDA_LIBRE = {
+  wordcloud: {
+    titulo: 'Los alumnos escriben una palabra o frase corta (hasta 25 caracteres).',
+    texto: 'En la pantalla se arma una nube: las respuestas más repetidas aparecen más grandes.',
+    proyeccion: '☁️ Al cerrar, se proyecta la nube de palabras de la clase.',
+  },
+  open: {
+    titulo: 'Los alumnos escriben una respuesta libre (hasta 250 caracteres).',
+    texto: 'En la pantalla se proyecta un muro con todas las respuestas.',
+    proyeccion: '💬 Al cerrar, se proyecta el muro de respuestas.',
+  },
+  brainstorm: {
+    titulo: 'Cada alumno aporta hasta 3 ideas (hasta 60 caracteres cada una).',
+    texto: 'En la pantalla se agrupan las ideas iguales y se ordenan por cuántos las propusieron.',
+    proyeccion: '💡 Al cerrar, se proyecta el tablero de ideas.',
+  },
 }
 const TIEMPOS = [
   { value: 5, label: '5 segundos' }, { value: 10, label: '10 segundos' },
@@ -447,6 +466,17 @@ const showAssistant = ref(false)
                 class="w-full rounded-xl border border-slate-200 shadow-sm px-4 py-3 text-slate-700 focus:outline-none focus:ring-2 focus:ring-marino resize-none"
               ></textarea>
             </div>
+
+            <!-- RESPUESTA LIBRE: no hay opciones que cargar, solo la consigna -->
+            <div v-else-if="TIPOS_LIBRES.includes(item.kind)"
+                 class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex items-start gap-4">
+              <component :is="TIPOS[item.kind].icon" :size="28" class="text-marino shrink-0 mt-0.5" />
+              <div class="space-y-1 text-sm text-slate-600">
+                <p class="font-semibold text-marino">{{ AYUDA_LIBRE[item.kind].titulo }}</p>
+                <p>{{ AYUDA_LIBRE[item.kind].texto }}</p>
+                <p class="text-xs text-slate-400">No suma puntos. Las respuestas con groserías no se proyectan.</p>
+              </div>
+            </div>
           </div>
         </div>
       </main>
@@ -490,8 +520,8 @@ const showAssistant = ref(false)
           </select>
         </div>
 
-        <!-- La encuesta y la diapositiva no puntúan. -->
-        <div v-if="item.kind !== 'slide' && item.kind !== 'poll'">
+        <!-- Encuesta, diapositiva y respuesta libre no puntúan. -->
+        <div v-if="!SIN_PUNTOS.includes(item.kind)">
           <label class="flex items-center gap-1.5 text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">
             <Award :size="14" /> Puntos
           </label>
@@ -597,6 +627,9 @@ const showAssistant = ref(false)
             <div class="rounded-lg p-3 text-sm font-bold bg-azul">Verdadero</div>
             <div class="rounded-lg p-3 text-sm font-bold bg-coral">Falso</div>
           </div>
+          <p v-else-if="TIPOS_LIBRES.includes(item.kind)" class="text-center text-sm text-white/60">
+            {{ AYUDA_LIBRE[item.kind].proyeccion }}
+          </p>
         </div>
       </div>
     </div>
